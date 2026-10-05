@@ -1,53 +1,59 @@
-# 🚀 Project Management App
+# project-pilot
 
-A full-featured **Project Management Web Application** built with the **MERN Stack**, designed to help individuals and teams efficiently manage projects, tasks, and collaboration in real time.
+> Full-stack agile project management and task dependency tracking platform built with React, Node.js, and MongoDB.
 
----
-
-## 🔧 Tech Stack
-
-- **Frontend:** React, Redux Toolkit, Tailwind CSS, Framer Motion
-- **Backend:** Node.js, Express.js, MongoDB
-- **Authentication:** JWT (JSON Web Tokens)
-- **State Management:** Redux Toolkit
-- **Styling:** Tailwind CSS
-- **Animations:** Framer Motion
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Frontend: React](https://img.shields.io/badge/Frontend-React-61DAFB.svg)](client/)
+[![Backend: Node.js](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-339933.svg)](server/)
+[![Database: MongoDB](https://img.shields.io/badge/Database-MongoDB-47A248.svg)]()
 
 ---
 
-## ✨ Features
+## Overview
 
-- 🔐 **User Authentication (JWT):**
-  - Sign up, login, secure routes
-  - Role-based access (admin, team member, manager)
+`project-pilot` is a collaborative project planning system designed for development teams to manage agile workflows, track task dependencies, and visualize sprint velocity. Built with a decoupled client-server architecture, it emphasizes clean domain models and RESTful API design.
 
-- 📁 **Project Management:**
-  - Create, update, delete projects
-  - Assign team members, team leader and manager
-  - Set deadlines, priorities
-
-- ✅ **Task Management:**
-  - Add tasks to projects
-  - Update status: To Do, In Progress, Done
-  - Assign tasks to users
-  - Due dates and priority tags
-
-- 🧑‍🤝‍🧑 **Team Collaboration:**
-  - Invite members to projects
-  - View task assignments
-
-- 📊 **Dashboard:**
-  - Visual overview of active projects and tasks
-  - Filters by status, priority, due date
-
-- 🎨 **Modern UI:**
-  - Fully responsive design with Tailwind CSS
-  - Smooth animations with Framer Motion
+### Key Capabilities
+* **Task & Dependency Tracking:** Create, assign, and organize tasks across customizable sprint stages with dependency graphs.
+* **Sprint Velocity Analytics:** Real-time progress rollups and task completion metrics.
+* **Decoupled Client-Server:** Express REST API server paired with a responsive React frontend interface.
+* **Role-Based Collaboration:** Team membership boundaries and scoped permission models.
 
 ---
 
-## Contributing
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+## Codebase Architecture
 
-## Author
-# Divyansh Kumar
+```
+project-pilot/
+├── client/     # React single-page application interface
+├── server/     # Express REST API, MongoDB Mongoose models, and route controllers
+└── LICENSE     # Standard MIT open-source license
+```
+
+---
+
+## Quickstart
+
+### Prerequisites
+* Node.js 18+
+* MongoDB local or cloud instance (Atlas)
+
+### 1. Backend Server Setup
+```bash
+git clone https://github.com/Divyanshkumar62/project-pilot.git
+cd project-pilot/server
+npm install
+npm run dev
+```
+
+### 2. Frontend Client Setup
+```bash
+cd ../client
+npm install
+npm start
+```
+
+---
+
+## License
+Distributed under the [MIT License](LICENSE).
