@@ -1,24 +1,38 @@
 {
-  "name": "server",
+  "name": "projectflow-server",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
     "build": "echo \"Build completed successfully\"",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest --runInBand --detectOpenHandles --forceExit",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage --runInBand --forceExit",
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "dev:local": "node dev-local.js",
+    "script:cleanup-tasks": "node scripts/cleanup-orphaned-tasks.js",
+    "script:inspect-tasks": "node scripts/inspect-tasks.js",
+    "script:test-mailer": "node scripts/testMailer.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "keywords": [
+    "projectflow",
+    "project-management",
+    "express",
+    "mongodb",
+    "socket.io",
+    "agile"
+  ],
+  "author": "Divyansh Kumar",
+  "license": "MIT",
+  "description": "Backend REST API and Socket.IO real-time engine for ProjectFlow",
   "dependencies": {
-    "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
     "express-validator": "^7.2.1",
+    "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.11.0",
     "multer": "^2.0.2",
@@ -27,6 +41,9 @@
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "jest": "^29.7.0",
+    "mongodb-memory-server": "^10.1.4",
+    "nodemon": "^3.1.9",
+    "supertest": "^7.0.0"
   }
 }

@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7-jammy
+    container_name: projectflow-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - projectflow-network
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: projectflow-server
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - NODE_ENV=production
+      - MONGO_URI=mongodb://mongodb:27017/projectflow
+      - JWT_SECRET=production_docker_jwt_secret_key_987654321
+    depends_on:
+      - mongodb
+    networks:
+      - projectflow-network
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: projectflow-client
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+    networks:
+      - projectflow-network
+
+networks:
+  projectflow-network:
+    driver: bridge
+
+volumes:
+  mongo-data:

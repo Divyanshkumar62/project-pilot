@@ -1,13 +1,17 @@
 const mongoose = require('mongoose');
 
-const connectDB = async () => {
+const connectDB = async (customUri) => {
     try {
-        const connection = await mongoose.connect(process.env.MONGO_URI)
-        console.log(`MongoDB connected: ${connection.connection.host}`);
-    } catch (err){
-        console.error(`Error: ${err.message}`);
-        process.exit(1);
+        const uri = customUri || process.env.MONGO_URI || "mongodb://127.0.0.1:27017/projectflow";
+        const connection = await mongoose.connect(uri);
+        console.log(`✅ MongoDB connected: ${connection.connection.host}`);
+        return connection;
+    } catch (err) {
+        console.error(`❌ MongoDB connection error: ${err.message}`);
+        if (process.env.NODE_ENV === 'production') {
+            process.exit(1);
+        }
     }
-}
+};
 
 module.exports = connectDB;

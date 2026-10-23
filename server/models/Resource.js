@@ -62,7 +62,6 @@ const resourceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-resourceSchema.index({ user: 1 });
 resourceSchema.index({ 'allocations.project': 1 });
 resourceSchema.index({ 'availability.date': 1 });
 

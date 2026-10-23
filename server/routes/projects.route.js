@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const { check, body } = require("express-validator");
 const auth = require("../middleware/auth");
-const requireRole = require("../middleware/auth").requireRole;
 
 const {
   createProject,
@@ -39,18 +38,17 @@ router.get("/:projectId/dashboard", auth, getProjectDashboard);
 // Supports search by name/description and pagination
 router.get("/", auth, getProject);
 router.get("/:id", auth, getProjectById);
-router.put("/:id", [auth, requireRole("Owner")], updateProject);
+router.put("/:id", auth, updateProject);
 
-// Project settings enhancements
-
-router.put("/:projectId/rename", [auth, requireRole("Owner")], renameProject);
-router.put("/:projectId/archive", [auth, requireRole("Owner")], archiveProject);
+// Project settings enhancements (controllers enforce project creator ownership)
+router.put("/:projectId/rename", auth, renameProject);
+router.put("/:projectId/archive", auth, archiveProject);
 router.put(
   "/:projectId/transfer-ownership/:userId",
-  [auth, requireRole("Owner")],
+  auth,
   transferOwnership
 );
-router.delete("/:id", [auth, requireRole("Owner")], deleteProject);
+router.delete("/:id", auth, deleteProject);
 
 const getMilestones = async (req, res) => {
   try {
@@ -60,15 +58,16 @@ const getMilestones = async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    const isMember = project.teamMembers.some(member =>
+    const isMember = project.teamMembers && project.teamMembers.some(member =>
       member.user.toString() === req.user.id
     );
+    const isCreator = project.createdBy.toString() === req.user.id;
 
-    if (!isMember) {
+    if (!isMember && !isCreator) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    res.json(project.milestones);
+    res.json(project.milestones || []);
   } catch (error) {
     console.error('Get milestones error:', error);
     res.status(500).json({ message: 'Error retrieving milestones' });

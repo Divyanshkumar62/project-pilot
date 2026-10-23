@@ -5,6 +5,8 @@ const { Server } = require("socket.io");
 const connectDB = require("./config/db");
 const cors = require("cors");
 const path = require("path");
+const helmet = require("helmet");
+const { apiLimiter, authLimiter, uploadLimiter } = require("./middleware/rateLimiter");
 
 const authRoutes = require("./routes/auth.route.js");
 const projectRoutes = require("./routes/projects.route.js");
@@ -22,12 +24,14 @@ const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
 
-// Connecting to the database
-connectDB();
+// HTTP Security Headers
+app.use(helmet({ crossOriginResourcePolicy: false }));
 
 const allowedOrigins = [
   "http://localhost:5173", 
+  "http://localhost:3000",
   "https://project-pilot-wine.vercel.app", // Vercel frontend
+  "https://project-pilot-two.vercel.app",
 ];
 
 app.use(
@@ -42,6 +46,14 @@ app.use(
     credentials: true,
   })
 );
+
+// Apply rate limiting in non-test environments
+if (process.env.NODE_ENV !== "test") {
+  app.use("/api/auth/login", authLimiter);
+  app.use("/api/auth/signup", authLimiter);
+  app.use("/api/uploads", uploadLimiter);
+  app.use("/api", apiLimiter);
+}
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -69,7 +81,11 @@ app.use("/api/resources", resourceRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'OK', 
+    service: 'ProjectFlow API',
+    timestamp: new Date().toISOString() 
+  });
 });
 
 // 404 handler for API routes
@@ -97,41 +113,40 @@ const connectedUsers = new Map();
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log('🔗 New client connected:', socket.id);
-
   // Handle user authentication
   socket.on('authenticate', (userId) => {
     connectedUsers.set(userId, socket.id);
     socket.userId = userId;
-    socket.join(userId); // Join user-specific room
-    console.log(`✅ User ${userId} authenticated`);
+    socket.join(userId);
   });
 
   // Handle joining project rooms
   socket.on('join_project', (projectId) => {
     socket.join(`project_${projectId}`);
-    console.log(`👥 Socket ${socket.id} joined project ${projectId}`);
   });
 
   // Handle leaving project rooms
   socket.on('leave_project', (projectId) => {
     socket.leave(`project_${projectId}`);
-    console.log(`👋 Socket ${socket.id} left project ${projectId}`);
   });
 
   // Handle disconnect
   socket.on('disconnect', () => {
     connectedUsers.delete(socket.userId);
-    console.log('🚫 Client disconnected:', socket.id);
   });
 });
 
 // Make io instance available globally for controllers
 global.io = io;
 
-// Start server
-server.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔌 Socket.IO enabled`);
-});
+// Connect to MongoDB and start listening only when run directly as main entrypoint
+if (require.main === module) {
+  connectDB();
+  server.listen(PORT, () => {
+    console.log(`🚀 ProjectFlow Server running on port ${PORT}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔌 Socket.IO enabled`);
+  });
+}
+
+module.exports = { app, server, io };

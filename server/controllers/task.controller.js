@@ -1,7 +1,7 @@
 const { validationResult } = require("express-validator");
 const Task = require("../models/Task");
-
 const Project = require("../models/Project");
+const User = require("../models/User");
 const { createNotification } = require("./notification.controller");
 const { logActivity } = require("./activity.controller");
 
@@ -11,7 +11,6 @@ const emitTaskUpdate = (event, projectId, taskData) => {
     global.io.to(`project_${projectId}`).emit(`task_${event}`, taskData);
   }
 };
-const User = require("../models/User");
 
 const createTask = async (req, res) => {
   const errors = validationResult(req);
@@ -19,7 +18,7 @@ const createTask = async (req, res) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { title, description, dueDate, priority, assignedTo } = req.body;
+  const { title, description, dueDate, priority, assignedTo, status } = req.body;
 
   try {
     const project = await Project.findById(req.params.projectId);
@@ -31,7 +30,7 @@ const createTask = async (req, res) => {
 
     // Check if user is project creator or team member
     const isCreator = project.createdBy.toString() === req.user.id;
-    const isTeamMember = project.teamMembers.some(
+    const isTeamMember = project.teamMembers && project.teamMembers.some(
       (member) => member.user.toString() === req.user.id
     );
 
@@ -46,11 +45,13 @@ const createTask = async (req, res) => {
       description,
       dueDate: dueDate || new Date(),
       priority: priority || "Medium",
+      status: status || "To Do",
       assignedTo: assignedTo || req.user.id,
       project: req.params.projectId,
     });
 
     await task.save();
+
     // Notify assigned user if not self
     if (assignedTo && assignedTo !== req.user.id) {
       const assignedUser = await User.findById(assignedTo);
@@ -63,6 +64,7 @@ const createTask = async (req, res) => {
         });
       }
     }
+
     // Log activity: task created
     await logActivity(
       project._id,
@@ -77,7 +79,7 @@ const createTask = async (req, res) => {
     res.status(201).json(task);
   } catch (err) {
     console.error(err.message);
-    res.status(500).json("Internal Server Error!");
+    res.status(500).json({ message: "Internal Server Error!" });
   }
 };
 
@@ -87,17 +89,18 @@ const fetchTasks = async (req, res) => {
     if (!project) {
       return res.status(404).json({ err: "Project not found!" });
     }
-    // Check if user is project creator or team member
+
     const isCreator = project.createdBy.toString() === req.user.id;
-    const isTeamMember = project.teamMembers.some(
+    const isTeamMember = project.teamMembers && project.teamMembers.some(
       (member) => member.user.toString() === req.user.id
     );
+
     if (!isCreator && !isTeamMember) {
       return res
         .status(403)
         .json({ msg: "Not authorized to view tasks for this project!" });
     }
-    // Build filter object
+
     const {
       status,
       priority,
@@ -107,6 +110,7 @@ const fetchTasks = async (req, res) => {
       page = 1,
       limit = 10,
     } = req.query;
+
     const filter = { project: req.params.projectId };
     if (status && ["To Do", "In Progress", "Completed"].includes(status)) {
       filter.status = status;
@@ -130,11 +134,13 @@ const fetchTasks = async (req, res) => {
         { description: { $regex: keyword, $options: "i" } },
       ];
     }
+
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const tasks = await Task.find(filter)
       .populate("assignedTo", "name email")
       .skip(skip)
       .limit(parseInt(limit));
+
     const total = await Task.countDocuments(filter);
     res.status(200).json({
       tasks,
@@ -162,16 +168,21 @@ const fetchUserTasks = async (req, res) => {
 
 const getTaskById = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.projectId);
+    const task = await Task.findById(req.params.taskId);
+    if (!task) {
+      return res.status(404).json({ msg: "Task not Found!" });
+    }
+
+    const projectId = req.params.projectId || task.project;
+    const project = await Project.findById(projectId);
     if (!project) {
       return res.status(404).json({
         err: "Project not found!",
       });
     }
 
-    // Check if user is project creator or team member
     const isCreator = project.createdBy.toString() === req.user.id;
-    const isTeamMember = project.teamMembers.some(
+    const isTeamMember = project.teamMembers && project.teamMembers.some(
       (member) => member.user.toString() === req.user.id
     );
 
@@ -181,20 +192,15 @@ const getTaskById = async (req, res) => {
       });
     }
 
-    const tasks = await Task.findById(req.params.taskId);
-    if (!tasks) {
-      return res.status(404).json({ msg: "Task not Found!" });
-    }
-    res.status(200).json(tasks);
+    res.status(200).json(task);
   } catch (err) {
     console.log(err.message);
-    res.status(500).json("Internal Server Error!");
+    res.status(500).json({ message: "Internal Server Error!" });
   }
 };
 
 const updateTask = async (req, res) => {
-  const { title, description, dueDate, status, priority, assignedTo } =
-    req.body;
+  const { title, description, dueDate, status, priority, assignedTo } = req.body;
   const taskFields = {};
   if (title) taskFields.title = title;
   if (description) taskFields.description = description;
@@ -204,16 +210,19 @@ const updateTask = async (req, res) => {
   if (assignedTo) taskFields.assignedTo = assignedTo;
 
   try {
-    const project = await Project.findById(req.params.projectId);
-    if (!project) {
-      return res.status(404).json({
-        err: "Project not found!",
-      });
+    let task = await Task.findById(req.params.taskId);
+    if (!task) {
+      return res.status(404).json({ msg: "Task not Found!" });
     }
 
-    // Check if user is project creator or team member
+    const projectId = req.params.projectId || task.project;
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({ err: "Project not found!" });
+    }
+
     const isCreator = project.createdBy.toString() === req.user.id;
-    const isTeamMember = project.teamMembers.some(
+    const isTeamMember = project.teamMembers && project.teamMembers.some(
       (member) => member.user.toString() === req.user.id
     );
 
@@ -221,11 +230,6 @@ const updateTask = async (req, res) => {
       return res.status(403).json({
         msg: "Not authorized to update tasks for this project!",
       });
-    }
-
-    let task = await Task.findById(req.params.taskId);
-    if (!task) {
-      return res.status(404).json({ msg: "Task not Found!" });
     }
 
     task = await Task.findByIdAndUpdate(
@@ -233,7 +237,7 @@ const updateTask = async (req, res) => {
       { $set: taskFields },
       { new: true }
     );
-    // Log activity: task updated
+
     await logActivity(
       project._id,
       req.user.id,
@@ -241,39 +245,36 @@ const updateTask = async (req, res) => {
       `Task '${task.title}' updated by ${req.user.id}`
     );
 
-    // Emit real-time update
     emitTaskUpdate('updated', project._id, task);
 
     res.status(200).json(task);
   } catch (err) {
     console.log(err.message);
-    res.status(500).json("Internal Server Error!");
+    res.status(500).json({ message: "Internal Server Error!" });
   }
 };
 
 const deleteTask = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.projectId);
-    if (!project) {
-      return res.status(404).json({
-        err: "Project not found!",
-      });
+    let task = await Task.findById(req.params.taskId);
+    if (!task) {
+      return res.status(404).json({ msg: "Task not Found!" });
     }
 
-    // Only project owners can delete tasks
+    const projectId = req.params.projectId || task.project;
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({ err: "Project not found!" });
+    }
+
     if (project.createdBy.toString() !== req.user.id) {
       return res.status(403).json({
         msg: "Only project owners can delete tasks!",
       });
     }
 
-    let task = await Task.findById(req.params.taskId);
-    if (!task) {
-      return res.status(404).json({ msg: "Task not Found!" });
-    }
-
     await Task.findByIdAndDelete(req.params.taskId);
-    // Log activity: task deleted
+
     await logActivity(
       project._id,
       req.user.id,
@@ -281,29 +282,31 @@ const deleteTask = async (req, res) => {
       `Task '${task.title}' deleted by ${req.user.id}`
     );
 
-    // Emit real-time update
     emitTaskUpdate('deleted', project._id, { id: req.params.taskId });
 
     res.status(200).json({ msg: "Task Deleted!" });
   } catch (err) {
     console.log(err.message);
-    res.status(500).json("Internal Server Error!");
+    res.status(500).json({ message: "Internal Server Error!" });
   }
 };
 
 const updateTaskStatus = async (req, res) => {
   const { status } = req.body;
   try {
-    const project = await Project.findById(req.params.projectId);
-    if (!project) {
-      return res.status(404).json({
-        err: "Project not found!",
-      });
+    let task = await Task.findById(req.params.taskId);
+    if (!task) {
+      return res.status(404).json({ msg: "Task not Found!" });
     }
 
-    // Check if user is project creator or team member
+    const projectId = req.params.projectId || task.project;
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({ err: "Project not found!" });
+    }
+
     const isCreator = project.createdBy.toString() === req.user.id;
-    const isTeamMember = project.teamMembers.some(
+    const isTeamMember = project.teamMembers && project.teamMembers.some(
       (member) => member.user.toString() === req.user.id
     );
 
@@ -313,21 +316,15 @@ const updateTaskStatus = async (req, res) => {
       });
     }
 
-    let task = await Task.findById(req.params.taskId);
-    if (!task) {
-      return res.status(404).json({ msg: "Task not Found!" });
-    }
-
     task.status = status;
     await task.save();
 
-    // Emit real-time update
     emitTaskUpdate('updated', project._id, task);
 
     res.status(200).json(task);
   } catch (err) {
     console.log(err.message);
-    res.status(500).json("Internal Server Error!");
+    res.status(500).json({ message: "Internal Server Error!" });
   }
 };
 

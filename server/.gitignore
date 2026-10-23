@@ -1,2 +1,8 @@
-node_modules
-.env
+node_modules/
+.env*
+*.log
+uploads/*
+!uploads/.gitkeep
+uploads/avatars/*
+!uploads/avatars/.gitkeep
+coverage/
