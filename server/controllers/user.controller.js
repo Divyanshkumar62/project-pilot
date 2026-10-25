@@ -32,6 +32,7 @@ const updateMe = async (req, res) => {
     if (bio !== undefined) user.bio = sanitizeBio(bio);
     if (timezone) user.timezone = timezone;
     if (notificationPrefs) user.notificationPrefs = { ...user.notificationPrefs, ...notificationPrefs };
+    if (req.body.social) user.social = { ...user.social, ...req.body.social };
 
     await user.save();
     
@@ -57,6 +58,14 @@ const updatePassword = async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Guard demo test account against password modification
+    const DEMO_EMAILS = ["alex.dev@projectpilot.test", "alex.dev@projectflow.test"];
+    if (user.email && DEMO_EMAILS.includes(user.email.toLowerCase())) {
+      return res.status(403).json({
+        message: "Demo account credentials are read-only in public preview mode.",
+      });
+    }
 
     const match = await user.matchPassword(currentPassword);
     if (!match) {

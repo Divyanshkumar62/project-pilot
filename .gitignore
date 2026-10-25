@@ -55,3 +55,10 @@ build/
 # Testing coverage
 coverage/
 .nyc_output/
+
+# Temporary video render scratch files
+brag-output/
+
+# Local internal guides and trackers
+INTERVIEW_GUIDE.md
+TRACKER.md

@@ -169,7 +169,7 @@ router.post(
 );
 
 router.get("/search", async (req, res) => {
-  const { query } = req.query;
+  const query = req.query.query || req.query.q;
 
   if (!query) {
     return res.status(400).json({ message: "Query parameter is required." });
@@ -177,7 +177,7 @@ router.get("/search", async (req, res) => {
 
   try {
     const users = await User.find({
-      name: { $regex: query, $options: "i" },
+      $or: [{ name: { $regex: query, $options: "i" } }, { email: { $regex: query, $options: "i" } }],
     }).select("_id name email");
 
     res.status(200).json(users);
@@ -207,3 +207,5 @@ router.get("/test", async (req, res) => {
 });
 
 module.exports = router;
+
+

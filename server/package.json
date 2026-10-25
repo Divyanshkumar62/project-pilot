@@ -1,5 +1,5 @@
 {
-  "name": "projectflow-server",
+  "name": "project-pilot-server",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
@@ -15,7 +15,8 @@
     "script:test-mailer": "node scripts/testMailer.js"
   },
   "keywords": [
-    "projectflow",
+    "projectpilot",
+    "project-pilot",
     "project-management",
     "express",
     "mongodb",
@@ -24,7 +25,7 @@
   ],
   "author": "Divyansh Kumar",
   "license": "MIT",
-  "description": "Backend REST API and Socket.IO real-time engine for ProjectFlow",
+  "description": "Backend REST API and Socket.IO real-time engine for Project Pilot",
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",

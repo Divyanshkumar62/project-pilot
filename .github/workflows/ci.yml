@@ -1,4 +1,4 @@
-name: ProjectFlow CI
+name: Project Pilot CI
 
 on:
   push:

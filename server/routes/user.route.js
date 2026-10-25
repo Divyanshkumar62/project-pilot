@@ -15,6 +15,7 @@ router.put(
     body("bio").optional().isLength({ max: 500 }),
     body("timezone").optional().isString(),
     body("notificationPrefs").optional().isObject(),
+    body("social").optional().isObject(),
   ],
   userController.updateMe
 );
@@ -30,7 +31,17 @@ router.put(
 router.put(
   "/me/avatar",
   auth,
-  uploadAvatar.single("avatar"),
+  (req, res, next) => {
+    uploadAvatar.single("avatar")(req, res, (err) => {
+      if (err) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          return res.status(400).json({ message: "File too large. Maximum size is 2MB" });
+        }
+        return res.status(400).json({ message: err.message || "Failed to upload avatar" });
+      }
+      next();
+    });
+  },
   userController.updateAvatar
 );
 router.get("/:userId", userController.getPublicProfile);

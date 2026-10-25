@@ -106,6 +106,10 @@ const projectSchema = new mongoose.Schema({
   templateId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Template"
+  },
+  isSeed: {
+    type: Boolean,
+    default: false,
   }
 }, {
   timestamps: true,

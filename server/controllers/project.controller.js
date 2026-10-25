@@ -1,8 +1,11 @@
 const { validationResult } = require("express-validator");
 const Project = require("../models/Project");
+const Task = require("../models/Task");
+const Comment = require("../models/Comment");
 const { createNotification } = require("./notification.controller");
 const { logActivity } = require("./activity.controller");
 const User = require("../models/User");
+const { dispatchWebhookEvent } = require("../utils/webhookDispatcher");
 
 // Rename project (Owner only)
 const renameProject = async (req, res) => {
@@ -29,16 +32,35 @@ const renameProject = async (req, res) => {
 const archiveProject = async (req, res) => {
   try {
     const { projectId } = req.params;
-    const { archived } = req.body;
+    const { archived, reason, completionSummary, lessonsLearned } = req.body;
     const project = await Project.findById(projectId);
     if (!project) return res.status(404).json({ error: "Project not found" });
     if (project.createdBy.toString() !== req.user.id) {
       return res.status(403).json({ error: "Only owner can archive" });
     }
-    project.archived = !!archived;
+    project.archived = archived !== undefined ? !!archived : true;
+    if (project.archived) {
+      project.archivedAt = new Date();
+      project.archivedBy = req.user.id;
+      if (reason) project.archiveReason = reason;
+      if (completionSummary || lessonsLearned) {
+        project.archiveData = {
+          completionSummary: completionSummary || "",
+          lessonsLearned: lessonsLearned || "",
+        };
+      }
+    }
     await project.save();
+    if (project.archived) {
+      dispatchWebhookEvent(project._id, "project.archived", {
+        projectId: project._id,
+        title: project.title,
+        archiveReason: project.archiveReason,
+      });
+    }
     res.json({ success: true, archived: project.archived });
   } catch (err) {
+    console.error("Archive project error:", err);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -155,6 +177,14 @@ const createProject = async (req, res) => {
   }
   const { title, description, startDate, endDate, teamMembers } = req.body;
   try {
+    // Enforce project creation limit in preview mode (max 10 projects per user)
+    const existingCount = await Project.countDocuments({ createdBy: req.user.id });
+    if (existingCount >= 10) {
+      return res.status(400).json({
+        error: "Project limit reached. Maximum 10 projects per user in demo preview.",
+      });
+    }
+
     // Convert teamMembers array to include role structure
     const formattedTeamMembers = teamMembers
       ? teamMembers.map((memberId) => ({
@@ -236,9 +266,7 @@ const getProject = async (req, res) => {
 const getProjectById = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id)
-      .populate("tasks") // ✅ Load tasks
       .populate("teamMembers.user", "name email");
-    console.log("🔹 Project Data:", JSON.stringify(project, null, 2));
     if (!project) {
       return res.status(404).json({ msg: "Project not found" });
     }
@@ -253,7 +281,38 @@ const getProjectById = async (req, res) => {
       return res.status(401).json({ msg: "Not authorized" });
     }
 
-    res.json(project);
+    // Load all tasks directly belonging to this project
+    const projectTasks = await Task.find({ project: project._id })
+      .populate("assignedTo", "name email");
+
+    const projectObj = project.toObject();
+    const taskIds = projectTasks.map((t) => t._id);
+    const commentCounts = await Comment.aggregate([
+      {
+        $match: {
+          task: { $in: taskIds },
+          isDeleted: { $ne: true },
+        },
+      },
+      {
+        $group: {
+          _id: "$task",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    const countMap = {};
+    commentCounts.forEach((c) => {
+      countMap[c._id.toString()] = c.count;
+    });
+
+    projectObj.tasks = projectTasks.map((t) => {
+      const obj = t.toObject ? t.toObject() : { ...t };
+      obj.commentsCount = countMap[t._id.toString()] || 0;
+      return obj;
+    });
+
+    res.json(projectObj);
   } catch (err) {
     console.error(err.message);
     if (err.kind === "ObjectId") {
@@ -352,7 +411,6 @@ const deleteProject = async (req, res) => {
 };
 
 // Dashboard analytics controller
-const Task = require("../models/Task");
 const Activity = require("../models/Activity");
 
 const getProjectDashboard = async (req, res) => {
@@ -441,11 +499,12 @@ const addMilestone = async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    const isMember = project.teamMembers.some(member => 
+    const isMember = project.teamMembers && project.teamMembers.some(member => 
       member.user.toString() === req.user.id
     );
+    const isCreator = project.createdBy.toString() === req.user.id;
 
-    if (!isMember) {
+    if (!isMember && !isCreator) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -474,6 +533,15 @@ const updateMilestone = async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
+    const isMember = project.teamMembers && project.teamMembers.some(member => 
+      member.user.toString() === req.user.id
+    );
+    const isCreator = project.createdBy.toString() === req.user.id;
+
+    if (!isMember && !isCreator) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
     const milestone = project.milestones.id(milestoneId);
     if (!milestone) {
       return res.status(404).json({ message: 'Milestone not found' });
@@ -488,6 +556,13 @@ const updateMilestone = async (req, res) => {
     }
 
     await project.save();
+    if (status === 'Completed') {
+      dispatchWebhookEvent(project._id, "milestone.completed", {
+        milestoneId,
+        title: milestone.title,
+        dueDate: milestone.dueDate,
+      });
+    }
     res.json(milestone);
   } catch (error) {
     console.error('Update milestone error:', error);
@@ -503,6 +578,15 @@ const deleteMilestone = async (req, res) => {
     const project = await Project.findById(projectId);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
+    }
+
+    const isMember = project.teamMembers && project.teamMembers.some(member => 
+      member.user.toString() === req.user.id
+    );
+    const isCreator = project.createdBy.toString() === req.user.id;
+
+    if (!isMember && !isCreator) {
+      return res.status(403).json({ message: 'Not authorized' });
     }
 
     const milestone = project.milestones.id(milestoneId);

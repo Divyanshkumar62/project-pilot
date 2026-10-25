@@ -12,7 +12,7 @@ describe("Task Endpoints (/api/tasks & /api/projects/:projectId/tasks)", () => {
       .post("/api/auth/signup")
       .send({
         name: "Dev Lead",
-        email: "lead@projectflow.test",
+        email: "lead@projectpilot.test",
         password: "LeadPassword123!",
       });
 

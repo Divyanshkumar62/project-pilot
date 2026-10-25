@@ -6,7 +6,8 @@ const connectDB = require("./config/db");
 const cors = require("cors");
 const path = require("path");
 const helmet = require("helmet");
-const { apiLimiter, authLimiter, uploadLimiter } = require("./middleware/rateLimiter");
+const { apiLimiter, authLimiter, uploadLimiter, webhookLimiter } = require("./middleware/rateLimiter");
+const { startCleanupScheduler } = require("./services/cleanupService");
 
 const authRoutes = require("./routes/auth.route.js");
 const projectRoutes = require("./routes/projects.route.js");
@@ -20,6 +21,9 @@ const uploadRoutes = require("./routes/uploads");
 const templateRoutes = require("./routes/template.route");
 const timeEntryRoutes = require("./routes/timeEntries.route");
 const resourceRoutes = require("./routes/resource.route");
+const webhookRoutes = require("./routes/webhook.route");
+const auth = require("./middleware/auth");
+const { listAllUserWebhooks, testGlobalWebhook } = require("./controllers/webhook.controller");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
@@ -30,14 +34,26 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 const allowedOrigins = [
   "http://localhost:5173", 
   "http://localhost:3000",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:3000",
   "https://project-pilot-wine.vercel.app", // Vercel frontend
   "https://project-pilot-two.vercel.app",
 ];
 
+const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  // Allow any localhost or 127.0.0.1 origin regardless of port for local development
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    return true;
+  }
+  return false;
+};
+
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (isOriginAllowed(origin)) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
@@ -78,12 +94,15 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/templates", templateRoutes);
 app.use("/api/time-entries", timeEntryRoutes);
 app.use("/api/resources", resourceRoutes);
+app.use("/api/projects/:projectId/webhooks", webhookRoutes);
+app.get("/api/webhooks", auth, listAllUserWebhooks);
+app.post("/api/webhooks/:webhookId/test", auth, webhookLimiter, testGlobalWebhook);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
-    service: 'ProjectFlow API',
+    service: 'Project Pilot API',
     timestamp: new Date().toISOString() 
   });
 });
@@ -102,7 +121,13 @@ const PORT = process.env.PORT || 5001;
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: function (origin, callback) {
+      if (isOriginAllowed(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   },
   maxHttpBufferSize: 1e8,
@@ -142,8 +167,11 @@ global.io = io;
 // Connect to MongoDB and start listening only when run directly as main entrypoint
 if (require.main === module) {
   connectDB();
+  if (process.env.NODE_ENV !== "test") {
+    startCleanupScheduler();
+  }
   server.listen(PORT, () => {
-    console.log(`🚀 ProjectFlow Server running on port ${PORT}`);
+    console.log(`🚀 Project Pilot Server running on port ${PORT}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🔌 Socket.IO enabled`);
   });

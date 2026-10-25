@@ -42,6 +42,15 @@ const userSchema = new mongoose.Schema(
       emailTaskAssigned: { type: Boolean, default: true },
       emailMentions: { type: Boolean, default: true },
     },
+    social: {
+      linkedin: { type: String, default: "" },
+      github: { type: String, default: "" },
+      twitter: { type: String, default: "" },
+    },
+    isSeed: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

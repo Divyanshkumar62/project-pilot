@@ -5,7 +5,7 @@ const User = require("../models/User");
 describe("Auth Endpoints (/api/auth)", () => {
   const testUser = {
     name: "Alex Dev",
-    email: "alex.dev@projectflow.test",
+    email: "alex.dev@projectpilot.test",
     password: "Password123!",
   };
 

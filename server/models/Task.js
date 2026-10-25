@@ -41,6 +41,10 @@ const taskSchema = new mongoose.Schema(
         createdAt: { type: Date, default: Date.now },
       },
     ],
+    isSeed: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

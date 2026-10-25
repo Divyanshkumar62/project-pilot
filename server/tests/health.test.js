@@ -6,7 +6,7 @@ describe("Health & Root API Endpoints", () => {
     const res = await request(app).get("/api/health");
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveProperty("status", "OK");
-    expect(res.body).toHaveProperty("service", "ProjectFlow API");
+    expect(res.body).toHaveProperty("service", "Project Pilot API");
     expect(res.body).toHaveProperty("timestamp");
   });
 

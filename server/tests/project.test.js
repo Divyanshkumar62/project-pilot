@@ -10,7 +10,7 @@ describe("Project Endpoints (/api/projects)", () => {
       .post("/api/auth/signup")
       .send({
         name: "Project Owner",
-        email: "owner@projectflow.test",
+        email: "owner@projectpilot.test",
         password: "SecurePassword123!",
       });
 

@@ -2,8 +2,10 @@ const { validationResult } = require("express-validator");
 const Task = require("../models/Task");
 const Project = require("../models/Project");
 const User = require("../models/User");
+const Comment = require("../models/Comment");
 const { createNotification } = require("./notification.controller");
 const { logActivity } = require("./activity.controller");
+const { dispatchWebhookEvent } = require("../utils/webhookDispatcher");
 
 // Helper function to emit real-time updates
 const emitTaskUpdate = (event, projectId, taskData) => {
@@ -40,6 +42,14 @@ const createTask = async (req, res) => {
       });
     }
 
+    // Enforce task creation limit per project in demo preview (max 50 tasks)
+    const existingTaskCount = await Task.countDocuments({ project: req.params.projectId });
+    if (existingTaskCount >= 50) {
+      return res.status(400).json({
+        err: "Task limit reached. Maximum 50 tasks per project in demo preview.",
+      });
+    }
+
     const task = new Task({
       title,
       description,
@@ -51,6 +61,11 @@ const createTask = async (req, res) => {
     });
 
     await task.save();
+
+    // Maintain tasks array on project
+    if (!project.tasks) project.tasks = [];
+    project.tasks.push(task._id);
+    await project.save();
 
     // Notify assigned user if not self
     if (assignedTo && assignedTo !== req.user.id) {
@@ -75,6 +90,15 @@ const createTask = async (req, res) => {
 
     // Emit real-time update
     emitTaskUpdate('created', project._id, task);
+
+    // Dispatch webhook trigger
+    dispatchWebhookEvent(project._id, "task.created", {
+      taskId: task._id,
+      title: task.title,
+      status: task.status,
+      priority: task.priority,
+      assignedTo: task.assignedTo,
+    });
 
     res.status(201).json(task);
   } catch (err) {
@@ -141,9 +165,36 @@ const fetchTasks = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
+    const taskIds = tasks.map((t) => t._id);
+    const commentCounts = await Comment.aggregate([
+      {
+        $match: {
+          task: { $in: taskIds },
+          isDeleted: { $ne: true },
+        },
+      },
+      {
+        $group: {
+          _id: "$task",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const countMap = {};
+    commentCounts.forEach((c) => {
+      countMap[c._id.toString()] = c.count;
+    });
+
+    const tasksWithComments = tasks.map((t) => {
+      const obj = t.toObject ? t.toObject() : { ...t };
+      obj.commentsCount = countMap[t._id.toString()] || 0;
+      return obj;
+    });
+
     const total = await Task.countDocuments(filter);
     res.status(200).json({
-      tasks,
+      tasks: tasksWithComments,
       total,
       page: parseInt(page),
       limit: parseInt(limit),
@@ -159,7 +210,35 @@ const fetchUserTasks = async (req, res) => {
     const tasks = await Task.find({ assignedTo: req.user.id }).populate(
       "project"
     );
-    res.status(200).json(tasks);
+
+    const taskIds = tasks.map((t) => t._id);
+    const commentCounts = await Comment.aggregate([
+      {
+        $match: {
+          task: { $in: taskIds },
+          isDeleted: { $ne: true },
+        },
+      },
+      {
+        $group: {
+          _id: "$task",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const countMap = {};
+    commentCounts.forEach((c) => {
+      countMap[c._id.toString()] = c.count;
+    });
+
+    const tasksWithComments = tasks.map((t) => {
+      const obj = t.toObject ? t.toObject() : { ...t };
+      obj.commentsCount = countMap[t._id.toString()] || 0;
+      return obj;
+    });
+
+    res.status(200).json(tasksWithComments);
   } catch (err) {
     console.error("❌ Error fetching user tasks:", err);
     res.status(500).json({ message: "Internal Server Error" });
@@ -168,7 +247,7 @@ const fetchUserTasks = async (req, res) => {
 
 const getTaskById = async (req, res) => {
   try {
-    const task = await Task.findById(req.params.taskId);
+    const task = await Task.findById(req.params.taskId).populate("assignedTo", "name email");
     if (!task) {
       return res.status(404).json({ msg: "Task not Found!" });
     }
@@ -192,7 +271,14 @@ const getTaskById = async (req, res) => {
       });
     }
 
-    res.status(200).json(task);
+    const count = await Comment.countDocuments({
+      task: task._id,
+      isDeleted: { $ne: true },
+    });
+    const taskObj = task.toObject ? task.toObject() : { ...task };
+    taskObj.commentsCount = count;
+
+    res.status(200).json(taskObj);
   } catch (err) {
     console.log(err.message);
     res.status(500).json({ message: "Internal Server Error!" });
@@ -247,7 +333,33 @@ const updateTask = async (req, res) => {
 
     emitTaskUpdate('updated', project._id, task);
 
-    res.status(200).json(task);
+    // Dispatch webhook trigger
+    if (task.status === "Completed") {
+      dispatchWebhookEvent(project._id, "task.completed", {
+        taskId: task._id,
+        title: task.title,
+        status: task.status,
+        priority: task.priority,
+        projectId: project._id,
+      });
+    }
+
+    dispatchWebhookEvent(project._id, "task.updated", {
+      taskId: task._id,
+      title: task.title,
+      status: task.status,
+      priority: task.priority,
+      projectId: project._id,
+    });
+
+    const count = await Comment.countDocuments({
+      task: task._id,
+      isDeleted: { $ne: true },
+    });
+    const taskObj = task.toObject ? task.toObject() : { ...task };
+    taskObj.commentsCount = count;
+
+    res.status(200).json(taskObj);
   } catch (err) {
     console.log(err.message);
     res.status(500).json({ message: "Internal Server Error!" });
@@ -274,6 +386,12 @@ const deleteTask = async (req, res) => {
     }
 
     await Task.findByIdAndDelete(req.params.taskId);
+
+    // Remove task reference from project
+    if (project.tasks && project.tasks.length > 0) {
+      project.tasks.pull(task._id);
+      await project.save();
+    }
 
     await logActivity(
       project._id,
@@ -316,12 +434,48 @@ const updateTaskStatus = async (req, res) => {
       });
     }
 
+    const previousStatus = task.status;
     task.status = status;
     await task.save();
 
+    await logActivity(
+      project._id,
+      req.user.id,
+      "TASK_UPDATED",
+      `Task '${task.title}' status changed from '${previousStatus}' to '${task.status}' by ${req.user.id}`
+    );
+
     emitTaskUpdate('updated', project._id, task);
 
-    res.status(200).json(task);
+    // Dispatch webhook trigger
+    if (task.status === "Completed") {
+      dispatchWebhookEvent(project._id, "task.completed", {
+        taskId: task._id,
+        title: task.title,
+        status: task.status,
+        previousStatus,
+        priority: task.priority,
+        projectId: project._id,
+      });
+    }
+
+    dispatchWebhookEvent(project._id, "task.updated", {
+      taskId: task._id,
+      title: task.title,
+      status: task.status,
+      previousStatus,
+      priority: task.priority,
+      projectId: project._id,
+    });
+
+    const count = await Comment.countDocuments({
+      task: task._id,
+      isDeleted: { $ne: true },
+    });
+    const taskObj = task.toObject ? task.toObject() : { ...task };
+    taskObj.commentsCount = count;
+
+    res.status(200).json(taskObj);
   } catch (err) {
     console.log(err.message);
     res.status(500).json({ message: "Internal Server Error!" });
