@@ -28,10 +28,15 @@ export const updatePassword = async (passwordData) => {
   }
 };
 
-export const updateAvatar = async (file) => {
+export const updateAvatar = async (fileOrFormData) => {
   try {
-    const formData = new FormData();
-    formData.append('avatar', file);
+    const formData = (fileOrFormData instanceof FormData)
+      ? fileOrFormData
+      : (() => {
+          const fd = new FormData();
+          fd.append('avatar', fileOrFormData);
+          return fd;
+        })();
     
     const response = await api.put('/users/me/avatar', formData, {
       headers: {

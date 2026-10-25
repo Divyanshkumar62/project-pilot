@@ -22,6 +22,7 @@ import ManageInvitation from "./pages/Invitations/ManageInvitation";
 import { ProtectedRoute, RoleProtectedRoute } from "./routes/ProtectedRoute";
 import { NotificationProvider } from "./context/NotificationContext";
 import NotificationList from "./pages/Notifications/NotificationList";
+import { FeedbackProvider } from "./context/FeedbackContext";
 
 // Lazy-loaded components
 // Home page removed
@@ -33,6 +34,8 @@ const ProjectDetails = lazy(() => import("./pages/Projects/ProjectDetails"));
 const ProjectList = lazy(() => import("./pages/Projects/ProjectList"));
 const MyTasks = lazy(() => import("./pages/Tasks/MyTasks"));
 const TemplateLibrary = lazy(() => import("./pages/Templates/TemplateLibrary"));
+const TemplateDetails = lazy(() => import("./pages/Templates/TemplateDetails"));
+const Settings = lazy(() => import("./pages/setting"));
 
 const App = () => {
   const queryClient = new QueryClient();
@@ -45,9 +48,10 @@ const App = () => {
           <InvitationProvider>
             <NotificationProvider>
               <ProfileProvider>
-                <Router>
-                  <Suspense fallback={<SkeletonLoader />}>
-                    <Routes>
+                <FeedbackProvider>
+                  <Router>
+                    <Suspense fallback={<SkeletonLoader />}>
+                      <Routes>
                       <Route path="/" element={<LandingPage />} />
                       <Route path="/tasks" element={<TaskList />} />
                       <Route path="/login" element={<Login />} />
@@ -85,6 +89,14 @@ const App = () => {
                         }
                       />
                       <Route
+                        path="/templates/:templateId"
+                        element={
+                          <ProtectedRoute>
+                            <TemplateDetails />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
                         path="/projects/:projectId"
                         element={
                           <ProtectedRoute>
@@ -118,19 +130,11 @@ const App = () => {
                       />
                       <Route
                         path="/profile"
-                        element={
-                          <ProtectedRoute>
-                            <ProfileView />
-                          </ProtectedRoute>
-                        }
+                        element={<Navigate to="/settings" replace />}
                       />
                       <Route
                         path="/profile/edit"
-                        element={
-                          <ProtectedRoute>
-                            <ProfileEdit />
-                          </ProtectedRoute>
-                        }
+                        element={<Navigate to="/settings" replace />}
                       />
                       <Route
                         path="/profile/password"
@@ -140,11 +144,21 @@ const App = () => {
                           </ProtectedRoute>
                         }
                       />
+                      <Route
+                        path="/settings"
+                        element={
+                          <ProtectedRoute>
+                            <Settings />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route path="/setting" element={<Navigate to="/settings" replace />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </Suspense>
                 </Router>
-              </ProfileProvider>
+              </FeedbackProvider>
+            </ProfileProvider>
             </NotificationProvider>
           </InvitationProvider>
         </TaskProvider>
@@ -155,3 +169,4 @@ const App = () => {
 };
 
 export default App;
+

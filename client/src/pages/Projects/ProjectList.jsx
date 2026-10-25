@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 import ProjectCard from "../../components/project/ProjectCard";
+import DeleteConfirmationModal from "../../components/modals/DeleteConfirmationModal";
 import { useProjects, useDeleteProject } from "../../hooks/useProjects";
 import Sidebar from "../../components/dashboard/Sidebar";
 import { useLocation } from "react-router-dom";
 import { useDebounce } from "../../hooks/useDebounce";
 import { SkeletonProjectCard } from "../../components/ui/SkeletonCard";
+import { useFeedback } from "../../context/FeedbackContext";
 
 const ProjectList = ({ searchQuery, sortBy: propSortBy, sortOrder: propSortOrder }) => {
   const location = useLocation();
@@ -15,6 +17,7 @@ const ProjectList = ({ searchQuery, sortBy: propSortBy, sortOrder: propSortOrder
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
   const debouncedLocalSearch = useDebounce(localSearch, 300);
+  const { showDelete } = useFeedback();
   
   useEffect(() => {
     console.log('ProjectList re-rendered with showDeleteModal:', showDeleteModal);
@@ -74,10 +77,15 @@ const ProjectList = ({ searchQuery, sortBy: propSortBy, sortOrder: propSortOrder
     console.log('confirmDelete called with projectToDelete:', projectToDelete);
     if (projectToDelete) {
       deleteProjectMutation.mutate(projectToDelete);
+      showDelete("Project permanently deleted", {
+        description: "Workspace and associated tasks have been removed.",
+      });
       setShowDeleteModal(false);
       setProjectToDelete(null);
     }
   };
+
+  const targetProject = projects.find((p) => p._id === projectToDelete);
 
   if (loading) {
     return (
@@ -126,67 +134,16 @@ const ProjectList = ({ searchQuery, sortBy: propSortBy, sortOrder: propSortOrder
         </div>
         
         {/* Delete Confirmation Modal */}
-        {showDeleteModal && ReactDOM.createPortal(
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 999999
-          }}>
-            <div style={{
-              backgroundColor: 'white',
-              padding: '24px',
-              borderRadius: '8px',
-              maxWidth: '400px',
-              width: '90%',
-              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)'
-            }}>
-              <h3 style={{ color: 'red', marginBottom: '16px', fontSize: '18px', fontWeight: 'bold' }}>
-                Delete Project
-              </h3>
-              <p style={{ marginBottom: '24px', color: '#374151' }}>
-                Are you sure you want to delete this project? This action cannot be undone.
-              </p>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button
-                  onClick={confirmDelete}
-                  style={{
-                    flex: 1,
-                    backgroundColor: '#ef4444',
-                    color: 'white',
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Delete Project
-                </button>
-                <button
-                  onClick={() => setShowDeleteModal(false)}
-                  style={{
-                    flex: 1,
-                    backgroundColor: '#6b7280',
-                    color: 'white',
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+        <DeleteConfirmationModal
+          isOpen={showDeleteModal}
+          onClose={() => {
+            setShowDeleteModal(false);
+            setProjectToDelete(null);
+          }}
+          onConfirm={confirmDelete}
+          projectName={targetProject?.title}
+          isDeleting={deleteProjectMutation.isPending}
+        />
       </>
     );
   }
@@ -209,25 +166,25 @@ const ProjectList = ({ searchQuery, sortBy: propSortBy, sortOrder: propSortOrder
                 placeholder="Search projects..."
                 value={localSearch}
                 onChange={(e) => setLocalSearch(e.target.value)}
-                className="flex-1 min-w-0 sm:min-w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+                className="flex-1 min-w-0 sm:min-w-64 px-4 py-2 bg-white text-slate-800 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base shadow-xs placeholder:text-slate-400"
               />
               
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
                 <select
                   value={localSortBy}
                   onChange={(e) => setLocalSortBy(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                  className="px-3 py-2 bg-white text-slate-800 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm sm:text-base shadow-xs cursor-pointer"
                 >
                   <option value="createdAt">Date Created</option>
                   <option value="updatedAt">Last Updated</option>
-                  <option value="title">Name</option>
+                  <option value="title">Project Name</option>
                   <option value="status">Status</option>
                 </select>
                 
                 <select
                   value={localSortOrder}
                   onChange={(e) => setLocalSortOrder(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                  className="px-3 py-2 bg-white text-slate-800 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm sm:text-base shadow-xs cursor-pointer"
                 >
                   <option value="desc">Newest First</option>
                   <option value="asc">Oldest First</option>
@@ -256,71 +213,16 @@ const ProjectList = ({ searchQuery, sortBy: propSortBy, sortOrder: propSortOrder
       </div>
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && (() => {
-        alert('Modal should be showing now!');
-        return ReactDOM.createPortal(
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 999999
-          }}>
-            <div style={{
-              backgroundColor: 'white',
-              padding: '24px',
-              borderRadius: '8px',
-              maxWidth: '400px',
-              width: '90%',
-              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)',
-              border: '3px solid red'
-            }}>
-              <h3 style={{ color: 'red', marginBottom: '16px', fontSize: '18px', fontWeight: 'bold' }}>
-                Delete Project
-              </h3>
-              <p style={{ marginBottom: '24px', color: '#374151' }}>
-                Are you sure you want to delete this project? This action cannot be undone.
-              </p>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button
-                  onClick={confirmDelete}
-                  style={{
-                    flex: 1,
-                    backgroundColor: '#ef4444',
-                    color: 'white',
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Delete Project
-                </button>
-                <button
-                  onClick={() => setShowDeleteModal(false)}
-                  style={{
-                    flex: 1,
-                    backgroundColor: '#6b7280',
-                    color: 'white',
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        );
-      })()}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setProjectToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        projectName={targetProject?.title}
+        isDeleting={deleteProjectMutation.isPending}
+      />
 
     </div>
   );

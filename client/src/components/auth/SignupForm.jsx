@@ -4,6 +4,7 @@ import { AuthContext } from "../../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { validateEmail } from "../../utils/Helper";
 import { signup } from "../../services/authService";
+import { LuUser, LuMail, LuBriefcase, LuCircleAlert } from "react-icons/lu";
 
 const SignupForm = () => {
   const { loginUser } = useContext(AuthContext);
@@ -12,97 +13,197 @@ const SignupForm = () => {
     name: "",
     email: "",
     password: "",
-    role: "",
+    role: "member",
   });
   const [error, setError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (error) setError("");
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "email") {
+      if (value && !validateEmail(value)) {
+        setEmailError("Please enter a valid work email address");
+      } else {
+        setEmailError("");
+      }
+    }
   };
 
   const handleSignup = async (e) => {
     e.preventDefault();
+    setError("");
+
+    if (!validateEmail(formData.email)) {
+      setEmailError("Please enter a valid work email address");
+      return;
+    }
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      if (!validateEmail(formData.email)) {
-        setError("Please Enter a valid Email address!");
-        return;
-      }
       const data = await signup(formData);
-      console.log("Signup Response:", data);
       if (!data || !data.token) {
-        setError("Signup failed! Please try again.");
+        setError("Registration failed. Please try again.");
+        setLoading(false);
         return;
       }
+
       const token = data.token;
-      const user = { name: formData.name, email: formData.email };
+      const user = data.user || { name: formData.name, email: formData.email, role: formData.role };
       loginUser(token, user);
-      navigate("/login");
+      navigate("/dashboard");
     } catch (err) {
       console.error("Signup Error:", err.response?.data || err.message);
-      setError("Something went wrong, Please enter your details again!");
+      const serverMsg =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.[0]?.msg;
+      setError(serverMsg || "Registration failed. An account with this email may already exist.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <form
-      onSubmit={handleSignup}
-      className="w-full max-w-sm sm:max-w-md border-2 text-base sm:text-lg shadow-2xl mx-auto mt-8 sm:mt-20 p-6 sm:p-16 rounded-lg"
-    >
-      <h4 className="text-2xl sm:text-3xl mb-4 text-blue-700 font-medium text-center">
-        Signup
-      </h4>
-      <input
-        type="text"
-        placeholder="Name"
-        name="name"
-        className="w-full text-sm sm:text-md text-slate-500 bg-zinc-300 py-2 sm:py-3 mr-3 rounded-md outline-none border-[1.5px] px-3 sm:px-5 mb-4"
-        value={formData.name}
-        onChange={handleChange}
-        required
-      />
-      <input
-        type="text"
-        name="email"
-        placeholder="Email"
-        className="w-full text-sm sm:text-md text-slate-500 bg-zinc-300 py-2 sm:py-3 mr-3 rounded-md outline-none border-[1.5px] px-3 sm:px-5 mb-4"
-        value={formData.email}
-        required
-        onChange={handleChange}
-      />
-      <PasswordInput
-        name={"password"}
-        value={formData.password}
-        onChange={handleChange}
-        placeholder={"Enter password"}
-      />
-      <select
-        name="role"
-        className="w-full text-sm sm:text-md text-slate-500 bg-zinc-300 py-2 sm:py-3 mr-3 rounded-md outline-none border-[1.5px] px-3 sm:px-5 mb-4"
-        value={formData.role}
-        required
-        onChange={handleChange}
-      >
-        <option value="" disabled>
-          Select role
-        </option>
-        <option value="manager">Manager</option>
-        <option value="member">Member</option>
-        <option value="owner">Owner</option>
-      </select>
-      {error && <p className="text-red-500 text-sm pb-1">{error}</p>}
-      <button
-        type="submit"
-        className="btn-primary bg-blue-700 px-4 sm:px-6 py-2 rounded-md w-full sm:w-auto text-white text-center mt-2 hover:bg-blue-800 transition-colors"
-      >
-        Signup
-      </button>
-      <p className="text-sm text-left mt-4 text-nowrap">
-        Already registered?{" "}
-        <Link to={"/login"} className="font-medium text-blue-700">
-          Login to your account
-        </Link>
-      </p>
-    </form>
+    <div className="w-full">
+      {/* Header without extra subheading */}
+      <div className="mb-6">
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+          Create an account
+        </h2>
+      </div>
+
+      {/* Error alert banner */}
+      {error && (
+        <div className="mb-5 p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-start gap-2.5 text-xs sm:text-sm animate-fadeIn">
+          <LuCircleAlert size={18} className="flex-shrink-0 mt-0.5 text-red-600" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Form */}
+      <form onSubmit={handleSignup} className="space-y-4">
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            Full Name
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              name="name"
+              placeholder="Alex Johnson"
+              className="w-full text-sm text-slate-800 bg-white border border-slate-300 rounded-lg px-4 py-2.5 pl-10 outline-none transition-all duration-150 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
+              value={formData.name}
+              onChange={handleChange}
+              required
+            />
+            <LuUser
+              size={17}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            Work Email
+          </label>
+          <div className="relative">
+            <input
+              type="email"
+              name="email"
+              placeholder="alex@company.com"
+              className={`w-full text-sm text-slate-800 bg-white border ${
+                emailError ? "border-red-400 focus:border-red-500 focus:ring-red-100" : "border-slate-300 focus:border-blue-600 focus:ring-blue-100"
+              } rounded-lg px-4 py-2.5 pl-10 outline-none transition-all duration-150 focus:ring-2 placeholder:text-slate-400`}
+              value={formData.email}
+              onChange={handleChange}
+              required
+            />
+            <LuMail
+              size={17}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            />
+          </div>
+          {emailError && (
+            <p className="text-red-500 text-xs mt-1 pl-1">{emailError}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            Password (min 6 characters)
+          </label>
+          <div className="relative">
+            <PasswordInput
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="••••••••••••"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            Workspace Role
+          </label>
+          <div className="relative">
+            <select
+              name="role"
+              className="w-full text-sm text-slate-800 bg-white border border-slate-300 rounded-lg px-4 py-2.5 pl-10 outline-none transition-all duration-150 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+              value={formData.role}
+              onChange={handleChange}
+              required
+            >
+              <option value="member">Team Member (Contributor)</option>
+              <option value="manager">Engineering Manager (Project Lead)</option>
+              <option value="owner">Workspace Owner (Admin)</option>
+            </select>
+            <LuBriefcase
+              size={17}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-lg shadow-sm hover:shadow transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+        >
+          {loading ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span>Registering...</span>
+            </>
+          ) : (
+            <span>Register</span>
+          )}
+        </button>
+      </form>
+
+      {/* Footer link */}
+      <div className="mt-6 pt-5 border-t border-slate-200 text-center">
+        <p className="text-sm text-slate-600">
+          Already have an account?{" "}
+          <Link
+            to="/login"
+            className="font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+          >
+            Login
+          </Link>
+        </p>
+      </div>
+    </div>
   );
 };
 

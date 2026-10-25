@@ -1,5 +1,10 @@
-import React, { useMemo } from 'react';
-import { FaCalendar, FaTasks, FaClock, FaCheckCircle } from 'react-icons/fa';
+import React, { useMemo } from "react";
+import {
+  LuCalendar,
+  LuListTodo,
+  LuClock,
+  LuCircleCheck,
+} from "react-icons/lu";
 
 const GanttChart = ({ tasks = [], project }) => {
   // Calculate timeline data
@@ -8,18 +13,29 @@ const GanttChart = ({ tasks = [], project }) => {
 
     const projectStart = new Date(project.startDate || project.createdAt);
     const projectEnd = project.endDate ? new Date(project.endDate) : new Date();
-    
+
     // If no project end date, calculate based on tasks or default to 60 days
-    const calculatedEnd = tasks.length > 0 
-      ? new Date(Math.max(...tasks.map(t => new Date(t.dueDate || t.createdAt))))
-      : new Date(projectStart.getTime() + 60 * 24 * 60 * 60 * 1000);
-    
+    const calculatedEnd =
+      tasks.length > 0
+        ? new Date(
+            Math.max(
+              ...tasks.map((t) =>
+                new Date(t.dueDate || t.createdAt).getTime()
+              )
+            )
+          )
+        : new Date(projectStart.getTime() + 60 * 24 * 60 * 60 * 1000);
+
     const endDate = projectEnd > calculatedEnd ? projectEnd : calculatedEnd;
-    const totalDays = Math.ceil((endDate - projectStart) / (1000 * 60 * 60 * 24));
-    
-    // Generate date range for header
+    const totalDays = Math.max(
+      1,
+      Math.ceil((endDate - projectStart) / (1000 * 60 * 60 * 24))
+    );
+
+    // Generate date range markers for header
     const dateRange = [];
-    for (let i = 0; i <= totalDays; i += Math.max(1, Math.floor(totalDays / 10))) {
+    const step = Math.max(1, Math.floor(totalDays / 6));
+    for (let i = 0; i <= totalDays; i += step) {
       const date = new Date(projectStart.getTime() + i * 24 * 60 * 60 * 1000);
       dateRange.push(date);
     }
@@ -28,112 +44,136 @@ const GanttChart = ({ tasks = [], project }) => {
       projectStart,
       projectEnd: endDate,
       totalDays,
-      dateRange
+      dateRange,
     };
   }, [tasks, project]);
 
-  const getStatusColor = (status) => {
+  const getStatusBg = (status) => {
     switch (status) {
-      case 'Completed': return 'bg-green-500';
-      case 'In Progress': return 'bg-blue-500';
-      default: return 'bg-gray-400';
+      case "Completed":
+        return "bg-emerald-500";
+      case "In Progress":
+        return "bg-blue-600";
+      default:
+        return "bg-amber-500";
     }
   };
 
   const getTaskPosition = (task) => {
-    if (!timelineData) return { left: 0, width: 0 };
-    
+    if (!timelineData) return { left: "0%", width: "10%" };
+
     const taskStart = new Date(task.createdAt);
     const taskEnd = new Date(task.dueDate || task.updatedAt || task.createdAt);
-    
-    // Ensure task dates are within project timeline
-    const startDate = taskStart < timelineData.projectStart ? timelineData.projectStart : taskStart;
-    const endDate = taskEnd > timelineData.projectEnd ? timelineData.projectEnd : taskEnd;
-    
-    const startOffset = Math.max(0, (startDate - timelineData.projectStart) / (1000 * 60 * 60 * 24));
-    const duration = Math.max(1, (endDate - startDate) / (1000 * 60 * 60 * 24));
-    
+
+    const startDate =
+      taskStart < timelineData.projectStart
+        ? timelineData.projectStart
+        : taskStart;
+    const endDate =
+      taskEnd > timelineData.projectEnd ? timelineData.projectEnd : taskEnd;
+
+    const startOffset = Math.max(
+      0,
+      (startDate - timelineData.projectStart) / (1000 * 60 * 60 * 24)
+    );
+    const duration = Math.max(
+      1,
+      (endDate - startDate) / (1000 * 60 * 60 * 24)
+    );
+
     const leftPercent = (startOffset / timelineData.totalDays) * 100;
     const widthPercent = (duration / timelineData.totalDays) * 100;
-    
+
     return {
-      left: `${Math.min(leftPercent, 95)}%`,
-      width: `${Math.max(widthPercent, 2)}%`
+      left: `${Math.min(leftPercent, 90)}%`,
+      width: `${Math.max(Math.min(widthPercent, 100 - leftPercent), 6)}%`,
     };
   };
 
-  const getPriorityColor = (priority) => {
+  const getPriorityBorder = (priority) => {
     switch (priority?.toLowerCase()) {
-      case 'high': return 'border-l-red-500';
-      case 'medium': return 'border-l-yellow-500';
-      case 'low': return 'border-l-green-500';
-      default: return 'border-l-gray-500';
+      case "urgent":
+      case "critical":
+      case "high":
+        return "border-l-rose-500";
+      case "medium":
+        return "border-l-amber-500";
+      case "low":
+        return "border-l-blue-500";
+      default:
+        return "border-l-slate-400";
     }
   };
 
   if (!timelineData || tasks.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="text-center py-12">
-          <FaTasks size={48} className="mx-auto text-gray-300 mb-4" />
-          <h4 className="text-lg font-medium text-gray-600 mb-2">No timeline data</h4>
-          <p className="text-gray-500">
-            {tasks.length === 0 
-              ? 'Create some tasks to see the project timeline'
-              : 'Unable to generate timeline from current data'
-            }
-          </p>
-        </div>
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-10 text-center">
+        <LuListTodo size={40} className="mx-auto text-slate-300 mb-3" />
+        <h4 className="text-sm font-bold text-slate-800 mb-1">
+          No Timeline Schedule Available
+        </h4>
+        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+          Add tasks with due dates to this workspace to view the visual Gantt timeline.
+        </p>
       </div>
     );
   }
 
-  const completedTasks = tasks.filter(t => t.status === 'Completed').length;
-  const inProgressTasks = tasks.filter(t => t.status === 'In Progress').length;
-  const todoTasks = tasks.filter(t => t.status === 'To Do').length;
+  const completedTasks = tasks.filter((t) => t.status === "Completed").length;
+  const inProgressTasks = tasks.filter((t) => t.status === "In Progress").length;
+  const todoTasks = tasks.filter((t) => t.status === "To Do").length;
+  const progressPercent = Math.round((completedTasks / tasks.length) * 100);
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <FaCalendar className="text-blue-500" />
-            Project Timeline
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            {timelineData.projectStart.toLocaleDateString()} - {timelineData.projectEnd.toLocaleDateString()} 
-            ({timelineData.totalDays} days)
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <LuCalendar size={16} />
+            </div>
+            <h3 className="font-bold text-slate-900 text-base">Project Gantt Timeline</h3>
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            {timelineData.projectStart.toLocaleDateString()} to{" "}
+            {timelineData.projectEnd.toLocaleDateString()} ({timelineData.totalDays} days span)
           </p>
         </div>
-        
+
         {/* Legend */}
-        <div className="flex items-center gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-gray-400 rounded"></div>
-            <span>To Do ({todoTasks})</span>
+        <div className="flex items-center gap-3 text-xs font-semibold">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+            <span className="text-slate-600">To Do ({todoTasks})</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-blue-500 rounded"></div>
-            <span>In Progress ({inProgressTasks})</span>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+            <span className="text-slate-600">In Progress ({inProgressTasks})</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-green-500 rounded"></div>
-            <span>Completed ({completedTasks})</span>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+            <span className="text-slate-600">Completed ({completedTasks})</span>
           </div>
         </div>
       </div>
 
-      {/* Timeline Header */}
-      <div className="mb-4 overflow-x-auto">
-        <div className="min-w-[800px]">
-          <div className="flex border-b border-gray-200 pb-2 mb-4">
-            <div className="w-64 flex-shrink-0 font-medium text-gray-700">Task</div>
+      {/* Timeline Board */}
+      <div className="overflow-x-auto pb-2">
+        <div className="min-w-[720px]">
+          {/* Timeline Date Header */}
+          <div className="flex border-b border-slate-200 pb-2 mb-4">
+            <div className="w-64 shrink-0 text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Task Item
+            </div>
             <div className="flex-1 relative">
-              <div className="flex justify-between text-xs text-gray-500">
+              <div className="flex justify-between text-[11px] font-semibold text-slate-400">
                 {timelineData.dateRange.map((date, index) => (
-                  <span key={index} className="text-center">
-                    {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  <span key={index}>
+                    {date.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })}
                   </span>
                 ))}
               </div>
@@ -145,28 +185,28 @@ const GanttChart = ({ tasks = [], project }) => {
             {tasks.map((task) => {
               const position = getTaskPosition(task);
               return (
-                <div key={task._id} className="flex items-center">
-                  {/* Task Info */}
-                  <div className="w-64 flex-shrink-0 pr-4">
-                    <div className={`border-l-4 pl-3 ${getPriorityColor(task.priority)}`}>
-                      <h4 className="font-medium text-gray-900 text-sm truncate">
+                <div key={task._id} className="flex items-center group">
+                  {/* Task Info Column */}
+                  <div className="w-64 shrink-0 pr-4">
+                    <div
+                      className={`border-l-3 pl-3 py-0.5 ${getPriorityBorder(
+                        task.priority
+                      )}`}
+                    >
+                      <h4 className="font-bold text-slate-900 text-xs truncate">
                         {task.title}
                       </h4>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
                         <span className="flex items-center gap-1">
-                          {task.status === 'Completed' ? (
-                            <FaCheckCircle className="text-green-500" />
+                          {task.status === "Completed" ? (
+                            <LuCircleCheck className="text-emerald-500" size={11} />
                           ) : (
-                            <FaClock className="text-gray-400" />
+                            <LuClock className="text-slate-400" size={11} />
                           )}
                           {task.status}
                         </span>
                         {task.priority && (
-                          <span className={`px-2 py-0.5 rounded text-xs ${
-                            task.priority === 'High' ? 'bg-red-100 text-red-700' :
-                            task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-green-100 text-green-700'
-                          }`}>
+                          <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
                             {task.priority}
                           </span>
                         )}
@@ -174,18 +214,20 @@ const GanttChart = ({ tasks = [], project }) => {
                     </div>
                   </div>
 
-                  {/* Timeline Bar */}
-                  <div className="flex-1 relative h-8 bg-gray-50 rounded">
+                  {/* Task Bar Track */}
+                  <div className="flex-1 relative h-7 bg-slate-100/70 rounded-lg">
                     <div
-                      className={`absolute top-1 bottom-1 rounded ${getStatusColor(task.status)} opacity-80 hover:opacity-100 transition-opacity cursor-pointer`}
+                      className={`absolute top-1 bottom-1 rounded-md ${getStatusBg(
+                        task.status
+                      )} shadow-2xs hover:brightness-105 transition-all cursor-pointer`}
                       style={{
                         left: position.left,
-                        width: position.width
+                        width: position.width,
                       }}
                       title={`${task.title} (${task.status})`}
                     >
-                      <div className="h-full flex items-center justify-center text-white text-xs font-medium px-2">
-                        {position.width.replace('%', '') > 10 && task.title.substring(0, 15)}
+                      <div className="h-full flex items-center px-2 text-white text-[10px] font-semibold truncate">
+                        {task.title}
                       </div>
                     </div>
                   </div>
@@ -196,20 +238,10 @@ const GanttChart = ({ tasks = [], project }) => {
         </div>
       </div>
 
-      {/* Project Progress */}
-      <div className="mt-6 pt-4 border-t border-gray-200">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-medium text-gray-700">Overall Progress</span>
-          <span className="text-sm text-gray-600">
-            {Math.round((completedTasks / tasks.length) * 100)}% Complete
-          </span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div
-            className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-500"
-            style={{ width: `${(completedTasks / tasks.length) * 100}%` }}
-          ></div>
-        </div>
+      {/* Progress Footer */}
+      <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+        <span className="font-semibold text-slate-700">Sprint Timeline Progress</span>
+        <span className="font-bold text-slate-900">{progressPercent}% Completed</span>
       </div>
     </div>
   );

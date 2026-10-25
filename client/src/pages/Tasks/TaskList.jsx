@@ -51,6 +51,7 @@ const TaskList = () => {
 
   // Modal states
   const [showEditModal, setShowEditModal] = useState(false);
+  const [editModalTab, setEditModalTab] = useState("details");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [selectedTaskForDelete, setSelectedTaskForDelete] = useState(null);
@@ -117,8 +118,9 @@ const TaskList = () => {
     if (tasks.length === limit && page * limit < total) setPage((p) => p + 1);
   };
 
-  const handleEditTask = (task) => {
+  const handleEditTask = (task, tab = "details") => {
     setSelectedTask(task);
+    setEditModalTab(tab);
     setShowEditModal(true);
   };
 
@@ -255,6 +257,7 @@ const TaskList = () => {
         <EditTaskModal
           task={selectedTask}
           projectId={projectId}
+          initialTab={editModalTab}
           closeModal={handleCloseEditModal}
         />
       )}

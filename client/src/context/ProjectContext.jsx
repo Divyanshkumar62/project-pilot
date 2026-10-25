@@ -183,6 +183,7 @@ export const ProjectProvider = ({ children }) => {
         isProjectOwner,
         isProjectManager,
         searchProjects,
+        loadProjects,
       }}
     >
       {children}

@@ -12,9 +12,9 @@ const Dashboard = () => {
       <MobileNavbar />
       
       {/* Main Layout */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden bg-slate-50">
         {/* Sidebar - Hidden on mobile, shown on large screens */}
-        <div className="hidden lg:block">
+        <div className="hidden lg:block border-r border-slate-200/80 bg-white">
           <Sidebar />
         </div>
         

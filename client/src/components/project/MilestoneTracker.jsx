@@ -1,36 +1,52 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FaPlus, FaCalendar, FaCheckCircle, FaClock, FaExclamationTriangle } from 'react-icons/fa';
-import * as milestoneService from '../../services/milestoneService';
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  LuPlus,
+  LuCalendar,
+  LuCircleCheck,
+  LuClock,
+  LuTriangleAlert,
+  LuTrash2,
+  LuX,
+  LuLoader,
+  LuFlag,
+} from "react-icons/lu";
+import * as milestoneService from "../../services/milestoneService";
 
 const MilestoneTracker = ({ project, tasks = [] }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newMilestone, setNewMilestone] = useState({
-    title: '',
-    description: '',
-    dueDate: ''
+    title: "",
+    description: "",
+    dueDate: "",
   });
+  const [formError, setFormError] = useState("");
   const queryClient = useQueryClient();
 
-  // Fetch milestones from backend
-  const { data: milestones = [], isLoading, error } = useQuery({
-    queryKey: ['milestones', project?._id],
+  // Fetch milestones
+  const {
+    data: milestones = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["milestones", project?._id],
     queryFn: () => milestoneService.getMilestones(project._id),
-    enabled: !!project?._id
+    enabled: !!project?._id,
   });
 
   // Create milestone mutation
   const createMilestoneMutation = useMutation({
-    mutationFn: (milestoneData) => milestoneService.createMilestone(project._id, milestoneData),
+    mutationFn: (data) => milestoneService.createMilestone(project._id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries(['milestones', project._id]);
-      setNewMilestone({ title: '', description: '', dueDate: '' });
+      queryClient.invalidateQueries(["milestones", project._id]);
+      setNewMilestone({ title: "", description: "", dueDate: "" });
       setShowAddModal(false);
+      setFormError("");
     },
-    onError: (error) => {
-      console.error('Error creating milestone:', error);
-      alert('Failed to create milestone. Please try again.');
-    }
+    onError: (err) => {
+      console.error("Error creating milestone:", err);
+      setFormError(err?.message || "Failed to create milestone.");
+    },
   });
 
   // Update milestone mutation
@@ -38,222 +54,292 @@ const MilestoneTracker = ({ project, tasks = [] }) => {
     mutationFn: ({ milestoneId, status }) =>
       milestoneService.updateMilestone(project._id, milestoneId, { status }),
     onSuccess: () => {
-      queryClient.invalidateQueries(['milestones', project._id]);
+      queryClient.invalidateQueries(["milestones", project._id]);
     },
-    onError: (error) => {
-      console.error('Error updating milestone:', error);
-      alert('Failed to update milestone. Please try again.');
-    }
+    onError: (err) => {
+      console.error("Error updating milestone:", err);
+    },
   });
 
-  const handleAddMilestone = (e) => {
+  // Delete milestone mutation
+  const deleteMilestoneMutation = useMutation({
+    mutationFn: (milestoneId) =>
+      milestoneService.deleteMilestone(project._id, milestoneId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["milestones", project._id]);
+    },
+    onError: (err) => {
+      console.error("Error deleting milestone:", err);
+    },
+  });
+
+  const handleAddSubmit = (e) => {
     e.preventDefault();
+    if (!newMilestone.title.trim() || !newMilestone.dueDate) {
+      setFormError("Title and Due Date are required.");
+      return;
+    }
+
     createMilestoneMutation.mutate({
-      title: newMilestone.title,
-      description: newMilestone.description,
+      title: newMilestone.title.trim(),
+      description: newMilestone.description.trim(),
       dueDate: new Date(newMilestone.dueDate).toISOString(),
-      tasks: [] // Empty tasks array for now
+      tasks: [],
     });
   };
 
-  const handleStatusChange = (milestoneId, status) => {
-    updateMilestoneMutation.mutate({
-      milestoneId,
-      status
-    });
-  };
+  const completedCount = milestones.filter((m) => m.status === "Completed").length;
+  const progressPercent =
+    milestones.length > 0 ? Math.round((completedCount / milestones.length) * 100) : 0;
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Completed': return 'bg-green-100 text-green-800 border-green-200';
-      case 'Overdue': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'Completed': return <FaCheckCircle className="text-green-600" />;
-      case 'Overdue': return <FaExclamationTriangle className="text-red-600" />;
-      default: return <FaClock className="text-yellow-600" />;
-    }
-  };
-
-  // Calculate progress
-  const completedMilestones = milestones.filter(m => m.status === 'Completed').length;
-  const progressPercentage = milestones.length > 0 ? (completedMilestones / milestones.length) * 100 : 0;
-
-  // Sort milestones by due date
-  const sortedMilestones = [...milestones].sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+  const sortedMilestones = [...milestones].sort(
+    (a, b) => new Date(a.dueDate) - new Date(b.dueDate)
+  );
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <FaCalendar className="text-blue-500" />
-            Project Milestones
-          </h3>
-          <div className="flex items-center mt-3">
-            <div className="w-64 bg-gray-200 rounded-full h-3 mr-4">
-              <div 
-                className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-500 ease-out" 
-                style={{ width: `${progressPercentage}%` }}
-              ></div>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <LuFlag size={16} />
             </div>
-            <span className="text-sm font-medium text-gray-700">
-              {completedMilestones}/{milestones.length} completed ({Math.round(progressPercentage)}%)
-            </span>
+            <h3 className="font-bold text-slate-900 text-base">Project Milestones</h3>
           </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Track major deliverables and schedule deadlines for this workspace
+          </p>
         </div>
+
         <button
           onClick={() => setShowAddModal(true)}
-          disabled={isLoading}
-          className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm flex items-center gap-2 disabled:opacity-50"
+          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
         >
-          <FaPlus size={12} />
+          <LuPlus size={14} />
           Add Milestone
         </button>
       </div>
 
-      {/* Milestones Timeline */}
-      <div className="space-y-4">
-        {sortedMilestones.map((milestone, index) => {
-          const isOverdue = new Date(milestone.dueDate) < new Date() && milestone.status !== 'Completed';
-          const actualStatus = isOverdue ? 'Overdue' : milestone.status;
-          
-          return (
-            <div key={milestone._id} className="relative">
-              {/* Timeline line */}
-              {index < sortedMilestones.length - 1 && (
-                <div className="absolute left-6 top-12 w-0.5 h-16 bg-gray-200"></div>
-              )}
-              
-              <div className="flex items-start gap-4">
-                {/* Status icon */}
-                <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${getStatusColor(actualStatus)}`}>
-                  {getStatusIcon(actualStatus)}
-                </div>
-                
-                {/* Content */}
-                <div className="flex-1 bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{milestone.title}</h4>
-                      {milestone.description && (
-                        <p className="text-sm text-gray-600 mt-1">{milestone.description}</p>
-                      )}
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(actualStatus)}`}>
-                      {actualStatus}
-                    </span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center text-sm">
-                    <div className="flex items-center gap-4 text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <FaCalendar size={12} />
-                        Due: {new Date(milestone.dueDate).toLocaleDateString()}
-                      </span>
-                      {milestone.completedAt && (
-                        <span className="text-green-600 flex items-center gap-1">
-                          <FaCheckCircle size={12} />
-                          Completed {new Date(milestone.completedAt).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
-                    
-                    {milestone.status !== 'Completed' && (
-                      <button
-                        onClick={() => handleStatusChange(milestone._id, 'Completed')}
-                        className="text-green-600 hover:text-green-800 font-medium text-sm px-3 py-1 rounded-lg hover:bg-green-50 transition-colors"
-                      >
-                        Mark Complete
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+      {/* Progress Bar Card */}
+      <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-xl">
+        <div className="flex items-center justify-between text-xs font-semibold mb-2">
+          <span className="text-slate-700">Milestone Completion</span>
+          <span className="text-slate-900">
+            {completedCount} of {milestones.length} delivered ({progressPercent}%)
+          </span>
+        </div>
+        <div className="w-full bg-slate-200/80 rounded-full h-2 overflow-hidden">
+          <div
+            className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
       </div>
 
-      {milestones.length === 0 && (
-        <div className="text-center py-12">
-          <FaCalendar size={48} className="mx-auto text-gray-300 mb-4" />
-          <h4 className="text-lg font-medium text-gray-600 mb-2">No milestones yet</h4>
-          <p className="text-gray-500 mb-4">Create milestones to track important project phases</p>
+      {/* Milestones List */}
+      {isLoading ? (
+        <div className="p-8 text-center text-xs text-slate-400">Loading milestones...</div>
+      ) : sortedMilestones.length === 0 ? (
+        <div className="py-12 text-center border border-dashed border-slate-200 rounded-2xl">
+          <LuFlag size={32} className="mx-auto text-slate-300 mb-2" />
+          <h4 className="text-xs font-bold text-slate-700">No milestones defined</h4>
+          <p className="text-[11px] text-slate-400 mt-0.5 mb-3">
+            Set key target dates to measure sprint progress.
+          </p>
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
           >
+            <LuPlus size={13} />
             Create First Milestone
           </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {sortedMilestones.map((milestone) => {
+            const isCompleted = milestone.status === "Completed";
+            const isOverdue =
+              new Date(milestone.dueDate) < new Date() && !isCompleted;
+
+            return (
+              <div
+                key={milestone._id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-slate-200/80 hover:border-slate-300 bg-white shadow-2xs transition-all"
+              >
+                <div className="flex items-start gap-3 min-w-0">
+                  <button
+                    onClick={() =>
+                      updateMilestoneMutation.mutate({
+                        milestoneId: milestone._id,
+                        status: isCompleted ? "Pending" : "Completed",
+                      })
+                    }
+                    className={`mt-0.5 w-6 h-6 rounded-lg border flex items-center justify-center transition-all cursor-pointer ${
+                      isCompleted
+                        ? "bg-emerald-500 border-emerald-600 text-white"
+                        : "border-slate-300 hover:border-blue-500 text-transparent"
+                    }`}
+                    title={isCompleted ? "Mark incomplete" : "Mark completed"}
+                  >
+                    <LuCircleCheck size={14} />
+                  </button>
+
+                  <div className="min-w-0">
+                    <h4
+                      className={`text-sm font-bold truncate ${
+                        isCompleted
+                          ? "line-through text-slate-400"
+                          : "text-slate-900"
+                      }`}
+                    >
+                      {milestone.title}
+                    </h4>
+                    {milestone.description && (
+                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
+                        {milestone.description}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-3 mt-2 text-xs">
+                      <span className="flex items-center gap-1 text-slate-500">
+                        <LuCalendar size={13} className="text-slate-400" />
+                        Target: {new Date(milestone.dueDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                  <span
+                    className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
+                      isCompleted
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : isOverdue
+                        ? "bg-rose-50 text-rose-700 border-rose-200"
+                        : "bg-amber-50 text-amber-700 border-amber-200"
+                    }`}
+                  >
+                    {isCompleted ? "Completed" : isOverdue ? "Overdue" : "Pending"}
+                  </span>
+
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Delete milestone "${milestone.title}"?`)) {
+                        deleteMilestoneMutation.mutate(milestone._id);
+                      }
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                    title="Delete milestone"
+                  >
+                    <LuTrash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
       {/* Add Milestone Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <FaPlus className="text-blue-500" />
-              Add New Milestone
-            </h3>
-            
-            <form onSubmit={handleAddMilestone}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Title *</label>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs"
+          onClick={() => setShowAddModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl border border-slate-200/90 shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Add Milestone</h3>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <LuX size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
+              {formError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs">
+                  {formError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                  Milestone Title *
+                </label>
                 <input
                   type="text"
                   value={newMilestone.title}
-                  onChange={(e) => setNewMilestone({ ...newMilestone, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., Design Phase Complete"
+                  onChange={(e) =>
+                    setNewMilestone({ ...newMilestone, title: e.target.value })
+                  }
+                  placeholder="e.g. Beta MVP Release"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none"
                   required
                 />
               </div>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                  Description
+                </label>
                 <textarea
                   value={newMilestone.description}
-                  onChange={(e) => setNewMilestone({ ...newMilestone, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onChange={(e) =>
+                    setNewMilestone({
+                      ...newMilestone,
+                      description: e.target.value,
+                    })
+                  }
+                  placeholder="Key deliverables included in this milestone..."
                   rows={3}
-                  placeholder="Describe what this milestone represents..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none resize-none"
                 />
               </div>
-              
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Due Date *</label>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                  Target Due Date *
+                </label>
                 <input
                   type="date"
                   value={newMilestone.dueDate}
-                  onChange={(e) => setNewMilestone({ ...newMilestone, dueDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(e) =>
+                    setNewMilestone({
+                      ...newMilestone,
+                      dueDate: e.target.value,
+                    })
+                  }
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none cursor-pointer"
                   required
                 />
               </div>
-              
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  disabled={createMilestoneMutation.isLoading}
-                  className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
-                >
-                  {createMilestoneMutation.isLoading ? 'Creating...' : 'Add Milestone'}
-                </button>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition-colors"
-                  disabled={createMilestoneMutation.isLoading}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold text-xs rounded-xl cursor-pointer"
                 >
                   Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createMilestoneMutation.isPending}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {createMilestoneMutation.isPending ? (
+                    <>
+                      <LuLoader size={13} className="animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create Milestone"
+                  )}
                 </button>
               </div>
             </form>

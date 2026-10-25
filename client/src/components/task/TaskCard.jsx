@@ -1,57 +1,45 @@
-import React, { useState, useEffect } from "react";
-import { useUpdateTaskStatus } from "../../hooks/useTasks";
-import { FaEdit, FaTrash, FaCalendar, FaUser } from "react-icons/fa";
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { useFeedback } from "../../context/FeedbackContext";
+import {
+  LuSquarePen,
+  LuTrash2,
+  LuCalendar,
+  LuUser,
+  LuClock,
+  LuGripVertical,
+  LuMessageSquare,
+  LuCheck,
+} from "react-icons/lu";
 
-const TaskCard = ({ task, projectId, onEdit, onDelete }) => {
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [localTask, setLocalTask] = useState(task); // Local state for optimistic updates
-  const updateTaskStatusMutation = useUpdateTaskStatus();
+const TaskCard = ({
+  task,
+  projectId,
+  onEdit,
+  onDelete,
+  onStatusChange,
+}) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const { showSuccess } = useFeedback();
 
-  // Update local task when props change
-  useEffect(() => {
-    setLocalTask(task);
-  }, [task]);
-
-  // Extract projectId from task.project if not provided as prop
-  const effectiveProjectId = projectId || task?.project?._id || task?.project;
-
-  const statusColors = {
-    "To Do": "bg-gray-100 text-gray-800",
-    "In Progress": "bg-blue-100 text-blue-800",
-    "Completed": "bg-green-100 text-green-800"
+  const priorityConfig = {
+    High: {
+      border: "border-l-rose-500",
+      badge: "bg-rose-50 text-rose-700 border-rose-200",
+    },
+    Medium: {
+      border: "border-l-amber-500",
+      badge: "bg-amber-50 text-amber-800 border-amber-200",
+    },
+    Low: {
+      border: "border-l-emerald-500",
+      badge: "bg-emerald-50 text-emerald-800 border-emerald-200",
+    },
   };
+
+  const priorityStyle = priorityConfig[task.priority] || priorityConfig.Medium;
 
   const statusOptions = ["To Do", "In Progress", "Completed"];
-
-  const priorityColors = {
-    "Low": "text-green-600",
-    "Medium": "text-yellow-600",
-    "High": "text-red-600"
-  };
-
-  const handleStatusChange = async (newStatus) => {
-    if (newStatus === task.status) return;
-
-    // Optimistic update - update local state immediately
-    setLocalTask(prev => ({ ...prev, status: newStatus }));
-    setIsUpdating(true);
-
-    try {
-      await updateTaskStatusMutation.mutateAsync({
-        projectId: effectiveProjectId,
-        taskId: task._id,
-        status: newStatus
-      });
-      // Success - local state is already updated
-    } catch (error) {
-      console.error("Failed to update task status:", error);
-      // Revert optimistic update on failure
-      setLocalTask(task);
-      // TODO: Add error notification here
-    } finally {
-      setIsUpdating(false);
-    }
-  };
 
   const getDaysUntilDue = () => {
     if (!task.dueDate) return null;
@@ -60,100 +48,242 @@ const TaskCard = ({ task, projectId, onEdit, onDelete }) => {
     const diffTime = dueDate - now;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays < 0) return { text: `${Math.abs(diffDays)} days overdue`, color: "text-red-600", urgent: true };
-    if (diffDays === 0) return { text: "Due today", color: "text-orange-600", urgent: true };
-    if (diffDays <= 3) return { text: `${diffDays} days left`, color: "text-yellow-600", urgent: true };
-    if (diffDays <= 7) return { text: `${diffDays} days left`, color: "text-blue-600", urgent: false };
-    return { text: `${diffDays} days left`, color: "text-gray-600", urgent: false };
+    if (diffDays < 0)
+      return {
+        text: `${Math.abs(diffDays)}d overdue`,
+        color: "text-rose-600 bg-rose-50 border-rose-200",
+      };
+    if (diffDays === 0)
+      return {
+        text: "Due today",
+        color: "text-amber-700 bg-amber-50 border-amber-200",
+      };
+    if (diffDays <= 3)
+      return {
+        text: `${diffDays}d left`,
+        color: "text-amber-700 bg-amber-50 border-amber-200",
+      };
+    return {
+      text: `${diffDays}d left`,
+      color: "text-slate-600 bg-slate-50 border-slate-200",
+    };
   };
 
   const dueDateInfo = getDaysUntilDue();
 
+  const handleDragStart = (e) => {
+    setIsDragging(true);
+    e.dataTransfer.setData("text/plain", task._id);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
+
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${
-      task.priority === 'High' ? 'border-l-4 border-l-red-500' :
-      task.priority === 'Medium' ? 'border-l-4 border-l-yellow-500' :
-      'border-l-4 border-l-green-500'
-    }`}>
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="font-semibold text-gray-900 leading-tight">{task.title}</h3>
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${priorityColors[task.priority]} bg-opacity-20 ${task.priority === 'High' ? 'bg-red-100' : task.priority === 'Medium' ? 'bg-yellow-100' : 'bg-green-100'}`}>
-              {task.priority}
-            </span>
+    <motion.div
+      layout
+      whileHover={{ y: -2, transition: { duration: 0.15 } }}
+      draggable={true}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      className={`bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs hover:shadow-md transition-shadow duration-150 border-l-4 ${
+        priorityStyle.border
+      } ${
+        isDragging
+          ? "opacity-50 scale-95 ring-2 ring-blue-500 shadow-xl rotate-1 cursor-grabbing"
+          : "cursor-grab active:cursor-grabbing"
+      } ${task.status === "Completed" ? "bg-slate-50/60" : ""}`}
+    >
+      {/* Top Header: Title, Priority, Actions */}
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="flex items-start gap-1.5 flex-1 min-w-0">
+          <LuGripVertical
+            size={16}
+            className="text-slate-300 hover:text-slate-500 shrink-0 mt-0.5 cursor-grab"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <h4
+                className={`font-bold text-sm leading-snug line-clamp-2 transition-all ${
+                  task.status === "Completed"
+                    ? "line-through text-slate-500"
+                    : "text-slate-900"
+                }`}
+              >
+                {task.title}
+              </h4>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider shrink-0 ${
+                  priorityStyle.badge
+                }`}
+              >
+                {task.priority || "Medium"}
+              </span>
+              {task.status === "Completed" && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <LuCheck size={11} className="stroke-[3]" />
+                  Done
+                </span>
+              )}
+            </div>
+            {task.description && (
+              <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                {task.description}
+              </p>
+            )}
           </div>
-          {task.description && (
-            <p className="text-sm text-gray-600 mb-3 line-clamp-2">{task.description}</p>
+        </div>
+
+        {/* Action buttons (Comments, Edit & Delete) */}
+        <div className="flex items-center gap-1 shrink-0 ml-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onEdit) onEdit(task, "comments");
+            }}
+            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all cursor-pointer border ${
+              task.commentsCount > 0
+                ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 shadow-2xs"
+                : "text-slate-400 hover:text-blue-600 hover:bg-blue-50 border-transparent"
+            }`}
+            title={`${task.commentsCount || 0} Comments - Click to open discussion`}
+            aria-label="Comments & Discussion"
+          >
+            <LuMessageSquare
+              size={14}
+              className={task.commentsCount > 0 ? "text-blue-600" : ""}
+            />
+            {task.commentsCount > 0 && (
+              <span className="text-[11px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white leading-none">
+                {task.commentsCount}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onEdit) onEdit(task, "details");
+            }}
+            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+            title="Edit task"
+            aria-label="Edit task"
+          >
+            <LuSquarePen size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onDelete) onDelete(task);
+            }}
+            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+            title="Delete task"
+            aria-label="Delete task"
+          >
+            <LuTrash2 size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Meta: Assignee and Due Date */}
+      <div className="flex items-center justify-between text-xs text-slate-500 mt-3 pt-2.5 border-t border-slate-100 flex-wrap gap-2">
+        <div className="flex items-center gap-1.5">
+          {task.assignedTo?.name ? (
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold text-[10px] flex items-center justify-center">
+                {task.assignedTo.name.charAt(0).toUpperCase()}
+              </div>
+              <span className="font-medium text-slate-700 text-xs truncate max-w-[110px]">
+                {task.assignedTo.name}
+              </span>
+            </div>
+          ) : (
+            <span className="text-slate-400 text-[11px] flex items-center gap-1">
+              <LuUser size={12} />
+              Unassigned
+            </span>
           )}
         </div>
-        <div className="flex items-center gap-2 ml-3">
-          <button
-            onClick={() => onEdit && onEdit(task)}
-            className="text-gray-400 hover:text-blue-600 transition-colors"
-            title="Edit task"
-          >
-            <FaEdit size={14} />
-          </button>
-          <button
-            onClick={() => onDelete && onDelete(task)}
-            className="text-gray-400 hover:text-red-600 transition-colors"
-            title="Delete task"
-          >
-            <FaTrash size={14} />
-          </button>
+
+        <div className="flex items-center gap-2">
+          {task.commentsCount > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onEdit) onEdit(task, "comments");
+              }}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md border border-blue-200 transition-colors cursor-pointer"
+              title="View comments discussion"
+            >
+              <LuMessageSquare size={11} />
+              <span>
+                {task.commentsCount}{" "}
+                {task.commentsCount === 1 ? "comment" : "comments"}
+              </span>
+            </button>
+          )}
+
+          {dueDateInfo && (
+            <span
+              className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md border ${dueDateInfo.color}`}
+            >
+              <LuClock size={11} />
+              {dueDateInfo.text}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Task Meta */}
-      <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
-        {task.assignedTo && task.assignedTo.name && (
-          <div className="flex items-center gap-1">
-            <FaUser size={12} />
-            <span>{task.assignedTo.name}</span>
-          </div>
-        )}
-
-        {task.dueDate && (
-          <div className={`flex items-center gap-1 ${dueDateInfo?.color || 'text-gray-500'}`}>
-            <FaCalendar size={12} />
-            <span>{dueDateInfo?.text || new Date(task.dueDate).toLocaleDateString()}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Status Selector */}
-      <div className="flex items-center justify-between">
+      {/* Status Picker Selector */}
+      <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Status
+          </span>
           <select
-            value={localTask.status}
-            onChange={(e) => handleStatusChange(e.target.value)}
-            disabled={isUpdating}
-            className={`px-3 py-1 rounded-full text-xs font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${statusColors[localTask.status]} ${
-              isUpdating ? 'opacity-50 cursor-not-allowed' : ''
+            value={task.status || "To Do"}
+            onChange={(e) => {
+              e.stopPropagation();
+              const newStatus = e.target.value;
+              if (onStatusChange) {
+                onStatusChange(task._id, newStatus);
+              }
+              if (newStatus === "Completed") {
+                showSuccess(`Task "${task.title}" completed!`, {
+                  description: "Sprint velocity updated.",
+                });
+              }
+            }}
+            className={`text-xs font-semibold px-2.5 py-1 rounded-lg border cursor-pointer outline-none transition-colors ${
+              task.status === "Completed"
+                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                : task.status === "In Progress"
+                ? "bg-blue-50 text-blue-800 border-blue-200"
+                : "bg-slate-100 text-slate-700 border-slate-300"
             }`}
           >
-            {statusOptions.map((status) => (
-              <option key={status} value={status}>
-                {status}
+            {statusOptions.map((st) => (
+              <option key={st} value={st}>
+                {st}
               </option>
             ))}
           </select>
         </div>
 
-        <div className="text-xs text-gray-400">
-          {task.createdAt && `Created ${new Date(task.createdAt).toLocaleDateString()}`}
-        </div>
+        <span className="text-[10px] text-slate-400">
+          {task.createdAt &&
+            new Date(task.createdAt).toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+            })}
+        </span>
       </div>
-
-      {/* Loading overlay during status update */}
-      {isUpdating && (
-        <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center rounded-lg">
-          <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-        </div>
-      )}
-    </div>
+    </motion.div>
   );
 };
 

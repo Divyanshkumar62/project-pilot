@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaEllipsisV } from "react-icons/fa";
+import { LuEllipsisVertical, LuArrowRight, LuKanban, LuClock } from "react-icons/lu";
 import CreateTaskModal from "../../components/modals/CreateTaskModal";
 import UpdateProjectModal from "../../components/modals/UpdateProjectModal";
 import ProjectDetailsModal from "../../components/modals/ProjectDetailsModal";
@@ -15,7 +15,7 @@ const ProjectCard = ({ project, onDelete, onUpdate }) => {
   const menuRef = useRef(null);
 
   // Fetch tasks using React Query
-  const { data: projectTasks = [], isLoading: tasksLoading, error: tasksError } = useTasks(project._id);
+  const { data: projectTasks = [], isLoading: tasksLoading } = useTasks(project._id);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -27,126 +27,195 @@ const ProjectCard = ({ project, onDelete, onUpdate }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleAddTask = () => {
-    setIsTaskModalOpen(true);
+  const totalTasks = projectTasks.length;
+  const completedTasks = projectTasks.filter(
+    (t) => (t.status || "").toLowerCase() === "completed"
+  ).length;
+  const inProgressTasks = projectTasks.filter(
+    (t) => (t.status || "").toLowerCase() === "in progress"
+  ).length;
+  const toDoTasks = projectTasks.filter(
+    (t) => (t.status || "").toLowerCase() === "to do"
+  ).length;
+
+  const completionPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  const handleCardClick = (e) => {
+    // If click originated from or targeted inside the action menu, do not navigate
+    if (menuRef.current && menuRef.current.contains(e.target)) return;
+    // If any modal or action menu is currently open on this card, suppress navigation
+    if (isTaskModalOpen || isUpdateModalOpen || isDetailsModalOpen || isMenuOpen) return;
+    navigate(`/projects/${project._id}`);
   };
 
   return (
-    <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow">
-      <div className="flex justify-between items-start mb-3">
-        <h3 className="text-lg sm:text-xl font-semibold truncate mr-2 flex-1">{project.title}</h3>
-
-        <div className="relative flex-shrink-0">
-          <button 
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-1 hover:bg-gray-100 rounded"
-          >
-            <FaEllipsisV size={16} className="cursor-pointer text-gray-600" />
-          </button>
-          {isMenuOpen && (
-            <div
-              ref={menuRef}
-              className="absolute right-0 mt-2 w-36 sm:w-40 bg-white shadow-lg rounded-md p-2 z-40 border"
-              style={{ zIndex: 40 }}
+    <div
+      onClick={handleCardClick}
+      className="bg-white rounded-2xl border border-slate-200/90 hover:border-blue-400/80 shadow-xs hover:shadow-lg transition-all duration-200 p-5 flex flex-col justify-between group cursor-pointer relative"
+    >
+      <div>
+        {/* Top bar with tags and action dropdown */}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <span
+              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
+                project.status === "Completed"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : project.status === "In Progress"
+                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                  : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+              }`}
             >
-              <button
-                className="block w-full text-left px-2 sm:px-3 py-2 hover:bg-gray-100 text-sm rounded"
-                onClick={() => {
-                  setIsDetailsModalOpen(true);
-                  setIsMenuOpen(false);
-                }}
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              {project.status || "Active"}
+            </span>
+
+            {project.priority && (
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">
+                {project.priority}
+              </span>
+            )}
+          </div>
+
+          {/* Action menu */}
+          <div className="relative" ref={menuRef} onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              aria-label="Project actions"
+            >
+              <LuEllipsisVertical size={18} />
+            </button>
+
+            {isMenuOpen && (
+              <div
+                className="absolute right-0 mt-1 w-44 bg-white shadow-xl rounded-xl p-1.5 z-40 border border-slate-200 text-xs font-medium text-slate-700 animate-fadeIn"
               >
-                View Details
-              </button>
-              <button
-                className="block w-full text-left px-2 sm:px-3 py-2 hover:bg-gray-100 text-sm rounded"
-                onClick={handleAddTask}
-              >
-                Create Task
-              </button>
-              <button
-                className="block w-full text-left px-2 sm:px-3 py-2 hover:bg-gray-100 text-sm rounded"
-                onClick={() => setIsUpdateModalOpen(true)}
-              >
-                Update Project
-              </button>
-              <button
-                className="block w-full text-left px-2 sm:px-3 py-2 text-red-600 hover:bg-gray-100 text-sm rounded"
-                onClick={() => {
-                  onDelete();
-                  setIsMenuOpen(false);
-                }}
-              >
-                Remove Project
-              </button>
-            </div>
-          )}
+                <button
+                  className="w-full text-left px-3 py-2 hover:bg-slate-50 hover:text-blue-600 rounded-lg transition-colors cursor-pointer"
+                  onClick={() => {
+                    navigate(`/projects/${project._id}`);
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  Open Sprint Board
+                </button>
+                <button
+                  className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+                  onClick={() => {
+                    setIsDetailsModalOpen(true);
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  View Details
+                </button>
+                <button
+                  className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+                  onClick={() => {
+                    setIsTaskModalOpen(true);
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  Create Task
+                </button>
+                <button
+                  className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+                  onClick={() => {
+                    setIsUpdateModalOpen(true);
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  Edit Project
+                </button>
+                <div className="my-1 border-t border-slate-100" />
+                <button
+                  className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                  onClick={() => {
+                    onDelete();
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  Delete Project
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Title and Description */}
+        <h3 className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">
+          {project.title}
+        </h3>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1.5 line-clamp-2 leading-relaxed">
+          {project.description || "No project description provided."}
+        </p>
+
+        {/* Sprint Progress Section */}
+        <div className="mt-5 pt-4 border-t border-slate-100">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
+            <span>Sprint Progress</span>
+            <span className="text-slate-500 font-mono">
+              {tasksLoading ? "..." : `${completedTasks}/${totalTasks} done (${completionPercent}%)`}
+            </span>
+          </div>
+
+          <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-600 rounded-full transition-all duration-300"
+              style={{ width: `${completionPercent}%` }}
+            />
+          </div>
+
+          {/* Quick status counters */}
+          <div className="flex items-center gap-2 mt-3 text-[11px] font-medium">
+            <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200/80">
+              {toDoTasks} To Do
+            </span>
+            <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/80">
+              {inProgressTasks} In Progress
+            </span>
+            <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+              {completedTasks} Done
+            </span>
+          </div>
         </div>
       </div>
 
-      <p className="text-gray-600 mt-2 text-sm sm:text-base line-clamp-2">{project.description}</p>
-      
-      <div className="mt-3">
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          project.status === 'Completed' ? 'bg-green-100 text-green-800' :
-          project.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-          project.status === 'Planning' ? 'bg-yellow-100 text-yellow-800' :
-          'bg-gray-100 text-gray-800'
-        }`}>
-          {project.status}
+      {/* Card Footer */}
+      <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+        <span className="flex items-center gap-1.5 text-slate-400">
+          <LuClock size={13} />
+          <span>Active Sprint</span>
+        </span>
+
+        <span className="inline-flex items-center gap-1 text-blue-600 font-semibold group-hover:translate-x-0.5 transition-transform">
+          <span>Open Board</span>
+          <LuArrowRight size={13} />
         </span>
       </div>
 
-      {/* Task List */}
-      <div className="mt-4">
-        <h4 className="text-xs sm:text-sm font-medium text-gray-700 mb-2">
-          Tasks ({tasksLoading ? '...' : projectTasks.length})
-        </h4>
-        {tasksLoading ? (
-          <p className="text-gray-400 text-xs sm:text-sm">Loading tasks...</p>
-        ) : projectTasks && projectTasks.length > 0 ? (
-          <ul className="space-y-1">
-            {projectTasks.slice(0, 2).map((task) => (
-              <li key={task._id} className="text-xs sm:text-sm text-gray-600 flex items-center">
-                <span className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${
-                  task.status === 'Completed' ? 'bg-green-500' :
-                  task.status === 'In Progress' ? 'bg-blue-500' :
-                  'bg-gray-400'
-                }`}></span>
-                <span className="truncate">{task.title}</span>
-              </li>
-            ))}
-            {projectTasks.length > 2 && (
-              <li className="text-xs text-gray-500">
-                +{projectTasks.length - 2} more tasks
-              </li>
-            )}
-          </ul>
-        ) : (
-          <p className="text-gray-400 text-xs sm:text-sm">No tasks yet.</p>
+      {/* Modals with isolated click propagation */}
+      <div onClick={(e) => e.stopPropagation()}>
+        {isTaskModalOpen && (
+          <CreateTaskModal
+            projectId={project._id}
+            closeModal={() => setIsTaskModalOpen(false)}
+          />
+        )}
+        {isUpdateModalOpen && (
+          <UpdateProjectModal
+            project={project}
+            closeModal={() => setIsUpdateModalOpen(false)}
+            onUpdate={onUpdate}
+          />
+        )}
+        {isDetailsModalOpen && (
+          <ProjectDetailsModal
+            project={project}
+            closeModal={() => setIsDetailsModalOpen(false)}
+          />
         )}
       </div>
-
-      {/* Modals */}
-      {isTaskModalOpen && (
-        <CreateTaskModal
-          projectId={project._id}
-          closeModal={() => setIsTaskModalOpen(false)}
-        />
-      )}
-      {isUpdateModalOpen && (
-        <UpdateProjectModal
-          project={project}
-          closeModal={() => setIsUpdateModalOpen(false)}
-          onUpdate={onUpdate}
-        />
-      )}
-      {isDetailsModalOpen && (
-        <ProjectDetailsModal
-          project={project}
-          closeModal={() => setIsDetailsModalOpen(false)}
-        />
-      )}
     </div>
   );
 };

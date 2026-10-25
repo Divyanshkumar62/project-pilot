@@ -1,231 +1,279 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/dashboard/Sidebar';
 import CreateTemplateModal from '../../components/modals/CreateTemplateModal';
 import { useDebounce } from '../../hooks/useDebounce';
+import { ProjectContext } from '../../context/ProjectContext';
 import * as templateService from '../../services/templateService';
 import * as projectService from '../../services/projectService';
 import * as taskService from '../../services/taskService';
+import {
+  predefinedTemplates,
+  TEMPLATE_CATEGORIES,
+  getCategoryBadgeClass,
+} from '../../data/templatesData';
+import { LuSearch, LuPlus, LuClock, LuListChecks, LuSparkles, LuArrowRight } from 'react-icons/lu';
 
 const TemplateLibrary = () => {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creatingTemplateId, setCreatingTemplateId] = useState(null);
   const debouncedSearch = useDebounce(search, 300);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { loadProjects } = useContext(ProjectContext);
 
-  // Fetch templates
-  const { data: templates = [], isLoading } = useQuery({
+  // Fetch templates from API
+  const { data: apiTemplates = [], isLoading } = useQuery({
     queryKey: ['templates', debouncedSearch, category],
-    queryFn: () => templateService.getTemplates({
-      search: debouncedSearch,
-      category: category
-    })
+    queryFn: () =>
+      templateService.getTemplates({
+        search: debouncedSearch,
+        category: category,
+      }),
   });
 
-  // Create project from template
+  // Create project from backend template
   const createProjectMutation = useMutation({
     mutationFn: ({ templateId, projectData }) =>
       templateService.createProjectFromTemplate(templateId, projectData),
     onSuccess: (project) => {
       queryClient.invalidateQueries(['projects']);
       queryClient.invalidateQueries(['templates']);
+      if (typeof loadProjects === 'function') {
+        loadProjects();
+      }
+      setCreatingTemplateId(null);
       navigate(`/projects/${project._id}`);
-    }
+    },
+    onError: (err) => {
+      setCreatingTemplateId(null);
+      alert(err?.message || 'Failed to create workspace from template.');
+    },
   });
 
   const handleUseTemplate = (template) => {
+    setCreatingTemplateId(template._id);
     const projectData = {
-      title: `${template.name} Project`,
+      title: `${template.name} Workspace`,
       description: template.description,
       startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date(Date.now() + template.defaultDuration * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      endDate: new Date(
+        Date.now() + (template.defaultDuration || 30) * 24 * 60 * 60 * 1000
+      )
+        .toISOString()
+        .split('T')[0],
     };
-    
+
     createProjectMutation.mutate({ templateId: template._id, projectData });
   };
 
-  const categories = ['Software', 'Marketing', 'Design', 'Research', 'Operations', 'Other'];
-
-  // Predefined templates if none exist
-  const predefinedTemplates = [
-    {
-      _id: 'predefined-1',
-      name: 'Website Development',
-      description: 'Complete website development project with design, development, and deployment phases',
-      category: 'Software',
-      defaultDuration: 45,
-      usageCount: 0,
-      createdBy: { name: 'System' },
-      tasks: [
-        { title: 'Requirements Gathering', description: 'Collect and document project requirements', priority: 'High', estimatedDays: 3 },
-        { title: 'UI/UX Design', description: 'Create wireframes and design mockups', priority: 'High', estimatedDays: 7 },
-        { title: 'Frontend Development', description: 'Implement user interface', priority: 'Medium', estimatedDays: 15 },
-        { title: 'Backend Development', description: 'Develop server-side functionality', priority: 'Medium', estimatedDays: 12 },
-        { title: 'Testing & QA', description: 'Test functionality and fix bugs', priority: 'High', estimatedDays: 5 },
-        { title: 'Deployment', description: 'Deploy to production environment', priority: 'Medium', estimatedDays: 3 }
-      ]
-    },
-    {
-      _id: 'predefined-2',
-      name: 'Marketing Campaign',
-      description: 'Comprehensive marketing campaign from planning to execution',
-      category: 'Marketing',
-      defaultDuration: 30,
-      usageCount: 0,
-      createdBy: { name: 'System' },
-      tasks: [
-        { title: 'Market Research', description: 'Research target audience and competitors', priority: 'High', estimatedDays: 5 },
-        { title: 'Campaign Strategy', description: 'Develop campaign strategy and messaging', priority: 'High', estimatedDays: 3 },
-        { title: 'Content Creation', description: 'Create marketing materials and content', priority: 'Medium', estimatedDays: 10 },
-        { title: 'Campaign Launch', description: 'Execute campaign across channels', priority: 'High', estimatedDays: 2 },
-        { title: 'Performance Monitoring', description: 'Track and analyze campaign performance', priority: 'Medium', estimatedDays: 10 }
-      ]
-    },
-    {
-      _id: 'predefined-3',
-      name: 'Mobile App Development',
-      description: 'End-to-end mobile application development project',
-      category: 'Software',
-      defaultDuration: 60,
-      usageCount: 0,
-      createdBy: { name: 'System' },
-      tasks: [
-        { title: 'App Concept & Planning', description: 'Define app concept and create project plan', priority: 'High', estimatedDays: 5 },
-        { title: 'UI/UX Design', description: 'Design app interface and user experience', priority: 'High', estimatedDays: 10 },
-        { title: 'Frontend Development', description: 'Develop app frontend', priority: 'Medium', estimatedDays: 20 },
-        { title: 'Backend Development', description: 'Develop server-side components', priority: 'Medium', estimatedDays: 15 },
-        { title: 'Testing', description: 'Test app functionality and performance', priority: 'High', estimatedDays: 7 },
-        { title: 'App Store Submission', description: 'Submit app to app stores', priority: 'Medium', estimatedDays: 3 }
-      ]
-    }
-  ];
-
-  const displayTemplates = templates.length > 0 ? templates : predefinedTemplates;
-
   const handleUsePredefinedTemplate = async (template) => {
+    setCreatingTemplateId(template._id);
     try {
-      // Create project using service
       const projectData = {
-        title: `${template.name} Project`,
+        title: `${template.name} Workspace`,
         description: template.description,
         startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date(Date.now() + template.defaultDuration * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        endDate: new Date(
+          Date.now() + template.defaultDuration * 24 * 60 * 60 * 1000
+        )
+          .toISOString()
+          .split('T')[0],
       };
 
       const project = await projectService.createProject(projectData);
 
-      // Create tasks for the project
-      const taskPromises = template.tasks.map(async (templateTask, index) => {
-        const taskStartDate = new Date(projectData.startDate);
-        taskStartDate.setDate(taskStartDate.getDate() + (index * 2));
+      if (Array.isArray(template.tasks) && template.tasks.length > 0) {
+        const taskPromises = template.tasks.map(async (templateTask, index) => {
+          const taskStartDate = new Date(projectData.startDate);
+          taskStartDate.setDate(taskStartDate.getDate() + index * 2);
 
-        const taskData = {
-          title: templateTask.title,
-          description: templateTask.description,
-          priority: templateTask.priority,
-          dueDate: new Date(taskStartDate.getTime() + (templateTask.estimatedDays * 24 * 60 * 60 * 1000)).toISOString().split('T')[0]
-        };
+          const taskData = {
+            title: templateTask.title,
+            description: templateTask.description,
+            priority: templateTask.priority || 'Medium',
+            dueDate: new Date(
+              taskStartDate.getTime() +
+                (templateTask.estimatedDays || 3) * 24 * 60 * 60 * 1000
+            )
+              .toISOString()
+              .split('T')[0],
+          };
 
-        return taskService.createTask(project._id, taskData);
-      });
+          return taskService.createTask(project._id, taskData);
+        });
 
-      await Promise.all(taskPromises);
+        await Promise.all(taskPromises);
+      }
 
-      // Show success message
-      alert(`✅ Template "${template.name}" selected successfully!\n\nYour new project has been created. You can view it under "Projects" in the sidebar.`);
-
-      // Update queries and navigate
       queryClient.invalidateQueries(['projects']);
-      navigate(`/projects/${project._id}`)
+      if (typeof loadProjects === 'function') {
+        loadProjects();
+      }
+      setCreatingTemplateId(null);
+      navigate(`/projects/${project._id}`);
     } catch (error) {
-      alert('❌ Error creating project. Please try again.');
-      console.error('Error:', error);
+      console.error('Error creating project from template:', error);
+      setCreatingTemplateId(null);
+      alert(error?.message || 'Failed to create workspace from template.');
     }
   };
 
+  // Filter templates
+  const filteredPredefined = predefinedTemplates.filter((t) => {
+    const matchesSearch =
+      !debouncedSearch ||
+      t.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      t.description.toLowerCase().includes(debouncedSearch.toLowerCase());
+    const matchesCategory =
+      !category || t.category.toLowerCase() === category.toLowerCase();
+    return matchesSearch && matchesCategory;
+  });
+
+  const displayTemplates =
+    apiTemplates.length > 0 ? apiTemplates : filteredPredefined;
+
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-slate-50">
       <Sidebar />
       <div className="flex-1 overflow-auto">
-        <div className="p-6">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Project Templates</h1>
-            
-            {/* Search and Filters */}
-            <div className="flex gap-4 mb-6">
-              <input
-                type="text"
-                placeholder="Search templates..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Categories</option>
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-              
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                Create Template
-              </button>
+        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                Project Templates
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                Select a template to view details or launch an agile workspace immediately.
+              </p>
             </div>
+
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-4 py-2.5 rounded-xl shadow-xs hover:shadow transition-all font-semibold text-sm cursor-pointer"
+            >
+              <LuPlus size={18} />
+              <span>Create Template</span>
+            </button>
           </div>
 
-          {/* Templates Grid */}
-          {isLoading ? (
-            <div className="text-center py-12">Loading templates...</div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {displayTemplates.map((template) => (
-                <div key={template._id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{template.name}</h3>
-                      <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mt-1">
-                        {template.category}
-                      </span>
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {template.usageCount} uses
-                    </div>
-                  </div>
-                  
-                  <p className="text-gray-600 mb-4 line-clamp-3">{template.description}</p>
-                  
-                  <div className="mb-4">
-                    <div className="text-sm text-gray-500 mb-2">
-                      {template.tasks.length} tasks • {template.defaultDuration} days
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      By {template.createdBy.name}
-                    </div>
-                  </div>
-                  
-                  <button
-                    onClick={() => template._id.startsWith('predefined') ? 
-                      handleUsePredefinedTemplate(template) : 
-                      handleUseTemplate(template)
-                    }
-                    disabled={createProjectMutation.isLoading}
-                    className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
-                  >
-                    {createProjectMutation.isLoading ? 'Creating...' : 'Use Template'}
-                  </button>
-                </div>
+          {/* Search and Filters Bar with explicit white background */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-8">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Search templates by name or description..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-white text-slate-800 border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-sm shadow-xs focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all placeholder:text-slate-400"
+              />
+              <LuSearch
+                size={18}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+              />
+            </div>
+
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="bg-white text-slate-800 border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-medium shadow-xs focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none cursor-pointer sm:w-48"
+            >
+              <option value="">All Categories</option>
+              {TEMPLATE_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
               ))}
+            </select>
+          </div>
+
+          {/* Templates Grid with pixel-perfect row alignment */}
+          {isLoading ? (
+            <div className="text-center py-16 text-slate-500 text-sm">
+              Loading templates...
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+              {displayTemplates.map((template) => {
+                const isCurrentlyCreating = creatingTemplateId === template._id;
+
+                return (
+                  <div
+                    key={template._id}
+                    onClick={() => navigate(`/templates/${template._id}`)}
+                    className="bg-white rounded-2xl border border-slate-200/90 hover:border-blue-400/80 shadow-xs hover:shadow-lg transition-all duration-200 p-6 flex flex-col justify-between h-full group cursor-pointer"
+                  >
+                    <div>
+                      {/* Top Row: Category tag and usage count */}
+                      <div className="flex justify-between items-center gap-2 mb-3">
+                        <span
+                          className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${getCategoryBadgeClass(
+                            template.category
+                          )}`}
+                        >
+                          {template.category}
+                        </span>
+                        <span className="text-xs text-slate-400 font-medium">
+                          {template.usageCount || 0} uses
+                        </span>
+                      </div>
+
+                      {/* Template Title */}
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">
+                          {template.name}
+                        </h3>
+                        <LuArrowRight
+                          size={16}
+                          className="text-slate-300 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0"
+                        />
+                      </div>
+
+                      {/* Standardized 2-line description with uniform minimum height */}
+                      <p className="text-xs sm:text-sm text-slate-500 mt-2 min-h-[42px] line-clamp-2 leading-relaxed">
+                        {template.description}
+                      </p>
+
+                      {/* Metadata Section */}
+                      <div className="flex items-center gap-4 text-xs font-medium text-slate-500 mt-4 pt-3 border-t border-slate-100">
+                        <span className="inline-flex items-center gap-1.5">
+                          <LuListChecks size={15} className="text-slate-400" />
+                          {template.tasks?.length || 0} tasks
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <LuClock size={15} className="text-slate-400" />
+                          {template.defaultDuration || 30} days
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Pinned Bottom Button Section */}
+                    <div className="mt-6 pt-4 border-t border-slate-100">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevents navigating to details page
+                          template._id.startsWith('predefined')
+                            ? handleUsePredefinedTemplate(template)
+                            : handleUseTemplate(template);
+                        }}
+                        disabled={isCurrentlyCreating || creatingTemplateId !== null}
+                        className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-2.5 px-4 rounded-xl shadow-xs hover:shadow transition-all font-semibold text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        <LuSparkles size={16} />
+                        <span>
+                          {isCurrentlyCreating
+                            ? 'Creating Workspace...'
+                            : 'Use Template'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

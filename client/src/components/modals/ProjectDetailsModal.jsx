@@ -1,14 +1,24 @@
 import React, { useRef, useEffect } from "react";
-import { FaTimes, FaCalendar, FaUsers, FaTasks, FaExternalLinkAlt } from "react-icons/fa";
+import ReactDOM from "react-dom";
+import {
+  LuX,
+  LuCalendar,
+  LuUsers,
+  LuListChecks,
+  LuArrowRight,
+  LuClock,
+  LuExternalLink,
+} from "react-icons/lu";
 import { useTasks } from "../../hooks/useTasks";
 import { useNavigate } from "react-router-dom";
 
 const ProjectDetailsModal = ({ project, closeModal }) => {
   const modalRef = useRef(null);
   const navigate = useNavigate();
-  
-  // Fetch tasks for this specific project
-  const { data: projectTasks = [], isLoading: tasksLoading } = useTasks(project._id);
+
+  const { data: projectTasks = [], isLoading: tasksLoading } = useTasks(
+    project._id
+  );
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -20,183 +30,226 @@ const ProjectDetailsModal = ({ project, closeModal }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [closeModal]);
 
-  const handleViewFullProject = () => {
+  const handleOpenBoard = (e) => {
+    e.stopPropagation();
     closeModal();
     navigate(`/projects/${project._id}`);
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Completed': return 'bg-green-100 text-green-800';
-      case 'In Progress': return 'bg-blue-100 text-blue-800';
-      case 'Planning': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const getStatusBadge = (status) => {
+    switch (status?.toLowerCase()) {
+      case "completed":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "in progress":
+      case "active":
+        return "bg-blue-50 text-blue-700 border-blue-200";
+      default:
+        return "bg-slate-50 text-slate-700 border-slate-200";
     }
   };
 
-  const getTaskStatusColor = (status) => {
-    switch (status) {
-      case 'Completed': return 'bg-green-500';
-      case 'In Progress': return 'bg-blue-500';
-      default: return 'bg-gray-400';
+  const getPriorityBadge = (priority) => {
+    switch (priority?.toLowerCase()) {
+      case "high":
+        return "bg-rose-50 text-rose-700 border-rose-200";
+      case "medium":
+        return "bg-amber-50 text-amber-800 border-amber-200";
+      case "low":
+        return "bg-emerald-50 text-emerald-800 border-emerald-200";
+      default:
+        return "bg-slate-50 text-slate-700 border-slate-200";
     }
   };
 
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'High': return 'text-red-600';
-      case 'Medium': return 'text-yellow-600';
-      case 'Low': return 'text-green-600';
-      default: return 'text-gray-600';
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-[99999]">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden" ref={modalRef}>
+  const modalContent = (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        closeModal();
+      }}
+      className="fixed inset-0 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs z-[999999] p-4"
+    >
+      <div
+        ref={modalRef}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl border border-slate-200/90 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+      >
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-gray-200">
-          <div className="flex items-center gap-4">
-            <h2 className="text-2xl font-bold text-gray-900">{project.title}</h2>
+        <div className="flex items-start justify-between p-6 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2.5 mb-2">
+              <span
+                className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${getStatusBadge(
+                  project.status
+                )}`}
+              >
+                {project.status || "Active"}
+              </span>
+              {project.priority && (
+                <span
+                  className={`text-xs px-2.5 py-0.5 rounded-md font-bold uppercase tracking-wider border ${getPriorityBadge(
+                    project.priority
+                  )}`}
+                >
+                  {project.priority} Priority
+                </span>
+              )}
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              {project.title}
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleViewFullProject}
-              className="bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600 transition-colors text-sm flex items-center gap-2"
+              type="button"
+              onClick={handleOpenBoard}
+              className="inline-flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
-              <FaExternalLinkAlt size={12} />
-              View Full Project
+              <LuExternalLink size={14} />
+              <span>Open Board</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeModal();
+              }}
+              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              aria-label="Close modal"
+            >
+              <LuX size={18} />
             </button>
           </div>
-          <button
-            onClick={closeModal}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <FaTimes size={20} />
-          </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-          {/* Project Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div>
-              <h3 className="text-lg font-semibold mb-3 flex items-center">
-                <FaCalendar className="mr-2 text-blue-500" />
-                Project Details
-              </h3>
-              <div className="space-y-3">
-                <div>
-                  <span className="text-sm font-medium text-gray-500">Status:</span>
-                  <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}>
-                    {project.status}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-gray-500">Start Date:</span>
-                  <span className="ml-2 text-sm text-gray-700">
-                    {new Date(project.startDate).toLocaleDateString()}
-                  </span>
-                </div>
-                {project.endDate && (
-                  <div>
-                    <span className="text-sm font-medium text-gray-500">End Date:</span>
-                    <span className="ml-2 text-sm text-gray-700">
-                      {new Date(project.endDate).toLocaleDateString()}
-                    </span>
-                  </div>
-                )}
-                <div>
-                  <span className="text-sm font-medium text-gray-500">Created:</span>
-                  <span className="ml-2 text-sm text-gray-700">
-                    {new Date(project.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold mb-3 flex items-center">
-                <FaUsers className="mr-2 text-green-500" />
-                Team Members ({project.teamMembers?.length || 0})
-              </h3>
-              <div className="space-y-2">
-                {project.teamMembers?.map((member) => (
-                  <div key={member._id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <span className="text-sm font-medium">{member.user?.name || 'Unknown'}</span>
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      member.role === 'Owner' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {member.role}
-                    </span>
-                  </div>
-                )) || <p className="text-sm text-gray-500">No team members</p>}
-              </div>
-            </div>
-          </div>
-
+        <div className="p-6 overflow-y-auto space-y-6">
           {/* Description */}
-          <div className="mb-8">
-            <h3 className="text-lg font-semibold mb-3">Description</h3>
-            <p className="text-gray-700 leading-relaxed">{project.description}</p>
+          <div>
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Description
+            </h3>
+            <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 border border-slate-200/70 p-3.5 rounded-xl">
+              {project.description || "No project description provided."}
+            </p>
           </div>
 
-          {/* Tasks */}
+          {/* Dates & Timeline */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-slate-50 border border-slate-200/70 p-3.5 rounded-xl">
+              <span className="text-xs font-medium text-slate-500 block mb-1">
+                Kickoff / Start Date
+              </span>
+              <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <LuCalendar size={15} className="text-blue-600" />
+                {project.startDate
+                  ? new Date(project.startDate).toLocaleDateString()
+                  : "Not set"}
+              </span>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200/70 p-3.5 rounded-xl">
+              <span className="text-xs font-medium text-slate-500 block mb-1">
+                Target Delivery Date
+              </span>
+              <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <LuClock size={15} className="text-amber-600" />
+                {project.endDate
+                  ? new Date(project.endDate).toLocaleDateString()
+                  : "Open-ended sprint"}
+              </span>
+            </div>
+          </div>
+
+          {/* Tasks Breakdown */}
           <div>
-            <h3 className="text-lg font-semibold mb-3 flex items-center">
-              <FaTasks className="mr-2 text-orange-500" />
-              Tasks ({tasksLoading ? '...' : projectTasks.length})
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Sprint Tasks ({projectTasks.length})
+              </h3>
+              <span className="text-xs text-slate-500 font-medium">
+                {projectTasks.filter((t) => (t.status || "").toLowerCase() === "completed").length}{" "}
+                completed
+              </span>
+            </div>
+
             {tasksLoading ? (
-              <div className="text-center py-8">
-                <div className="text-gray-500">Loading tasks...</div>
+              <div className="text-xs text-slate-400 py-4 text-center">
+                Loading tasks...
               </div>
-            ) : projectTasks.length > 0 ? (
-              <div className="space-y-3">
+            ) : projectTasks.length === 0 ? (
+              <div className="text-xs text-slate-500 p-4 bg-slate-50 rounded-xl text-center border border-slate-100">
+                No tasks logged for this workspace yet.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {projectTasks.map((task) => (
-                  <div key={task._id} className={`border-l-4 border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow ${
-                    task.priority === 'High' ? 'border-l-red-500' :
-                    task.priority === 'Medium' ? 'border-l-yellow-500' :
-                    'border-l-green-500'
-                  }`}>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center mb-2">
-                          <span className={`w-3 h-3 rounded-full mr-3 ${getTaskStatusColor(task.status)}`}></span>
-                          <h4 className="font-medium text-gray-900">{task.title}</h4>
-                          <span className={`ml-2 text-xs font-medium ${getPriorityColor(task.priority)}`}>
-                            {task.priority}
-                          </span>
-                        </div>
-                        {task.description && (
-                          <p className="text-sm text-gray-600 mb-2 ml-6">{task.description}</p>
-                        )}
-                        <div className="flex items-center text-xs text-gray-500 ml-6">
-                          {task.assignedTo && (
-                            <span className="mr-4">Assigned to: {task.assignedTo.name}</span>
-                          )}
-                          {task.dueDate && (
-                            <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
-                          )}
-                        </div>
-                      </div>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        task.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                        task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {task.status}
+                  <div
+                    key={task._id}
+                    className="p-3 bg-white border border-slate-200/80 rounded-xl flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-900 truncate">
+                        {task.title}
+                      </p>
+                      {task.dueDate && (
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Due: {new Date(task.dueDate).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${getPriorityBadge(
+                          task.priority
+                        )}`}
+                      >
+                        {task.priority || "Medium"}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-700">
+                        {task.status || "To Do"}
                       </span>
                     </div>
                   </div>
                 ))}
               </div>
-            ) : (
-              <p className="text-gray-500 text-center py-8">No tasks created yet</p>
             )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 sm:p-6 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <span className="text-xs text-slate-500 font-medium">
+            Created: {new Date(project.createdAt).toLocaleDateString()}
+          </span>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeModal();
+              }}
+              className="bg-white hover:bg-slate-100 text-slate-700 font-semibold px-4 py-2 rounded-xl text-xs sm:text-sm border border-slate-200 transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenBoard}
+              className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold px-4 py-2 rounded-xl text-xs sm:text-sm shadow-xs hover:shadow transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <span>Go to Sprint Board</span>
+              <LuArrowRight size={14} />
+            </button>
           </div>
         </div>
       </div>
     </div>
   );
+
+  return ReactDOM.createPortal(modalContent, document.body);
 };
 
 export default ProjectDetailsModal;
