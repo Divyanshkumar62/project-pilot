@@ -3,6 +3,7 @@ const express = require("express");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
 const connectDB = require("./config/db");
+const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
 const helmet = require("helmet");
@@ -45,6 +46,10 @@ const isOriginAllowed = (origin) => {
   if (allowedOrigins.includes(origin)) return true;
   // Allow any localhost or 127.0.0.1 origin regardless of port for local development
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    return true;
+  }
+  // Allow any Vercel domain for project-pilot (production & preview branches)
+  if (/^https:\/\/project-pilot[a-z0-9-]*\.vercel\.app$/.test(origin)) {
     return true;
   }
   return false;
@@ -100,9 +105,26 @@ app.post("/api/webhooks/:webhookId/test", auth, webhookLimiter, testGlobalWebhoo
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
+  const uri = process.env.MONGO_URI;
+  let mongoHost = 'NOT_SET';
+  if (uri) {
+    try {
+      const parts = uri.split('@');
+      mongoHost = parts.length > 1 ? parts[1].split('/')[0] : 'raw_or_local';
+    } catch (e) {
+      mongoHost = 'PARSING_ERROR';
+    }
+  }
+
   res.json({ 
     status: 'OK', 
     service: 'Project Pilot API',
+    database: {
+      status: mongoose.connection.readyState === 1 ? 'connected' : (mongoose.connection.readyState === 2 ? 'connecting' : 'disconnected'),
+      readyState: mongoose.connection.readyState,
+      hasMongoUri: !!uri,
+      configuredHost: mongoHost,
+    },
     timestamp: new Date().toISOString() 
   });
 });

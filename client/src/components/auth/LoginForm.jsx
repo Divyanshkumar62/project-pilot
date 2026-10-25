@@ -62,9 +62,12 @@ const LoginForm = () => {
       navigate("/dashboard");
     } catch (err) {
       console.error("Login process failed:", err);
-      const serverMsg = err.response?.data?.message || err.response?.data?.errors?.[0]?.msg;
-      const networkMsg = (err.message === "Network Error" || !err.response) ? "Cannot connect to server. Check server status or CORS." : "Invalid email or password. Please try again.";
-      setError(serverMsg || networkMsg);
+      const serverMsg = err.message || err.response?.data?.message || err.response?.data?.errors?.[0]?.msg;
+      const isNetworkError = err.message === "Network Error" || err.code === "ERR_NETWORK";
+      const displayMsg = isNetworkError
+        ? "Cannot connect to server. Check server status or CORS."
+        : (serverMsg || "Invalid email or password. Please try again.");
+      setError(displayMsg);
     } finally {
       setLoading(false);
     }

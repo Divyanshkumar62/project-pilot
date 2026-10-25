@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://project-pilot-two.vercel.app/">
+  <a href="https://project-pilot-wine.vercel.app/">
     <img src="client/public/main-logo.svg" width="96" height="96" alt="Project Pilot Logo" />
   </a>
 </p>
@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <a href="https://project-pilot-two.vercel.app/">Live Demo</a> &bull;
+  <a href="https://project-pilot-wine.vercel.app/">Live Demo</a> &bull;
   <a href="#launch-showcase">Launch Video</a> &bull;
   <a href="#features">Features</a> &bull;
   <a href="#tech-stack">Tech Stack</a> &bull;
@@ -34,7 +34,7 @@
 
 Project Pilot is a full-stack agile project management and sprint delivery platform. It enables software teams to organize backlogs, track card movements across real-time Kanban boards, coordinate milestone deliverables, and automate outbound team notifications without communication friction.
 
-* **Live Demo:** [https://project-pilot-two.vercel.app/](https://project-pilot-two.vercel.app/)
+* **Live Demo:** [https://project-pilot-wine.vercel.app/](https://project-pilot-wine.vercel.app/)
 * **Repository:** [https://github.com/Divyanshkumar62/project-pilot](https://github.com/Divyanshkumar62/project-pilot)
 
 ---
@@ -42,13 +42,11 @@ Project Pilot is a full-stack agile project management and sprint delivery platf
 ## Launch Showcase
 
 <p align="center">
-  <a href="assets/showcase.mp4">
-    <img src="assets/poster.jpg" alt="Project Pilot Launch Video" width="100%" style="border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.3);" />
-  </a>
+  <img src="assets/showcase.gif" alt="Project Pilot Live Product Showcase" width="100%" style="border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.3);" />
 </p>
 
 <p align="center">
-  <em>Click the poster preview above or <a href="assets/showcase.mp4">play the high-definition product walkthrough (assets/showcase.mp4)</a> to view the full product experience.</em>
+  <em>Live product demonstration. Full 1080p MP4 walkthrough available at <a href="https://raw.githubusercontent.com/Divyanshkumar62/project-pilot/main/assets/showcase.mp4">assets/showcase.mp4</a>.</em>
 </p>
 
 ---

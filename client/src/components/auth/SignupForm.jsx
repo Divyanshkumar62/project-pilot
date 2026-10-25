@@ -63,6 +63,7 @@ const SignupForm = () => {
     } catch (err) {
       console.error("Signup Error:", err.response?.data || err.message);
       const serverMsg =
+        err.message ||
         err.response?.data?.message ||
         err.response?.data?.errors?.[0]?.msg;
       setError(serverMsg || "Registration failed. An account with this email may already exist.");
